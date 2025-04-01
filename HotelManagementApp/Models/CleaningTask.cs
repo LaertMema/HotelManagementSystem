@@ -13,7 +13,7 @@ namespace HotelManagementApp.Models
         public string Description { get; set; }
         
         public Priority Priority { get; set; } 
-        public MaintenanceRequestStatus Status { get; set; } // Pending, InProgress, Completed
+        public CleaningRequestStatus Status { get; set; } // Pending, InProgress, Completed
         public DateTime CreatedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public string CompletionNotes { get; set; }

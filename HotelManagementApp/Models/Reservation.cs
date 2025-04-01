@@ -13,6 +13,7 @@ namespace HotelManagementApp.Models
         public DateTime CheckOutDate { get; set; }
         public ReservationStatus Status { get; set; } // Enum instead of string
         public decimal TotalPrice { get; set; }
+        public PaymentMethod PaymentMethod { get; set; } // Use Enum
         public PaymentStatus PaymentStatus { get; set; } // Use Enum
         public int NumberOfGuests { get; set; }
         public string SpecialRequests { get; set; }
@@ -21,8 +22,13 @@ namespace HotelManagementApp.Models
         public int? RoomId { get; set; } // Nullable for unassigned rooms
         public Room Room { get; set; }
 
+        public int RoomTypeId { get; set; }
+        public RoomType RoomType { get; set; }
+
         // Tracking user actions
         public int? CreatedBy { get; set; }
+        public DateTime? CheckedInTime { get; set; }
+        public DateTime? CheckedOutTime { get; set; }
         public int? CheckedInBy { get; set; }
         public int? CheckedOutBy { get; set; }
         public ApplicationUser CreatedByUser { get; set; }

@@ -2,9 +2,12 @@
 {
     public enum ReservationStatus
     {
-        Confirmed,
+        Confirmed, //Keep either this or reserved
         CheckedIn,
         CheckedOut,
-        Cancelled
+        Cancelled,
+        Pending,
+        Reserved, // ??? Redundant
+        Completed
     }
 }

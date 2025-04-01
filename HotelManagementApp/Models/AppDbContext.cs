@@ -63,6 +63,14 @@ namespace HotelManagementApp.Models
                 .HasForeignKey(r => r.RoomId)
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            //Reservation- Room Type
+            builder.Entity<Reservation>()
+                .HasOne(r => r.RoomType)
+                .WithMany(rt => rt.Reservations)
+                .HasForeignKey(r => r.RoomTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             //Reservation-invoice
             builder.Entity<Reservation>()
                 .HasMany(r => r.Invoices)
