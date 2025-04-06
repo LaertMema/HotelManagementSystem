@@ -13,6 +13,11 @@ namespace HotelManagementApp.Models
         public int? AssignedTo { get; set; }
         public int? RoomId { get; set; }
 
+        //public int? ReservationId { get; set; }
+        //public string Location { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public string? ResolutionNotes { get; set; }
+
         public ApplicationUser ReportedByUser { get; set; }
         public ApplicationUser AssignedToUser { get; set; }
         public Room Room { get; set; }
