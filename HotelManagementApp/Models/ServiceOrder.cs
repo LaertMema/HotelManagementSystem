@@ -14,9 +14,14 @@ namespace HotelManagementApp.Models
         public ServiceOrderStatus Status { get; set; }
         public int? CompletedById { get; set; } // Nullable for pending orders
         public ApplicationUser CompletedBy { get; set; }
-        public DateTime? CompletedAt { get; set; } // Time when the service was completed
 
+        public DateTime? ScheduledTime { get; set; } // Optional scheduled time for services that need scheduling
+        public string? DeliveryLocation { get; set; } // For room service orders - specify room delivery location
+        public string? SpecialInstructions { get; set; } // Any special instructions from the guest
+        public DateTime? CompletedAt { get; set; } // Time when the service was completed
+        public string? CompletionNotes { get; set; } // Any additional notes or comments
         public Reservation Reservation { get; set; }
+
         public Service Service { get; set; }
     }
 }

@@ -1,6 +1,11 @@
 ﻿using HotelManagementApp.Models;
 using HotelManagementApp.Models.Enums;
+
+using HotelManagementApp.Services; // Add this line to ensure the namespace is included
 using Microsoft.EntityFrameworkCore;
+using HotelManagementApp.Services.InvoiceSpace;
+using HotelManagementApp.Services.CleaningTaskSpace;
+using HotelManagementApp.Models.DTOs.CleaningTask;
 
 namespace HotelManagementApp.Services.ReservationServiceSpace
 {
@@ -8,11 +13,17 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
     {
         private readonly AppDbContext _context;
         private readonly ILogger<ReservationService> _logger;
+        private readonly ICleaningService _cleaningTaskService;
+        private readonly IInvoiceService _invoiceService;
 
-        public ReservationService(AppDbContext context, ILogger<ReservationService> logger)
+
+        public ReservationService(AppDbContext context, ILogger<ReservationService> logger, ICleaningService cleaningService, IInvoiceService invoiceService)
         {
             _context = context;
             _logger = logger;
+            _cleaningTaskService = cleaningService;
+            _invoiceService = invoiceService;
+
         }
 
         // CRUD operations
@@ -420,18 +431,34 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 var room = reservation.Room;
                 room.Status = RoomStatus.Maintenance;
                 room.NeedsCleaning = true;// Mark for cleaning
+                var housekeepers = await _context.Users
+                .Join(_context.UserRoles, user => user.Id, userRole => userRole.UserId, (user, userRole) => new { user, userRole })
+                .Join(_context.Roles, combined => combined.userRole.RoleId, role => role.Id, (combined, role) => new { combined.user, role })
+                .Where(combined => combined.role.Name == "Housekeeper" && combined.user.IsActive)
+                .Select(combined => combined.user)
+                .ToListAsync();
+
+                // Assign to a random housekeeper if available, otherwise leave unassigned
+                int? assignedToId = null;
+                if (housekeepers.Any())
+                {
+                    var randomIndex = new Random().Next(0, housekeepers.Count);
+                    assignedToId = housekeepers[randomIndex].Id;
+                }
+
+
 
                 // Create cleaning task
-                var cleaningTask = new CleaningTask
+                CreateCleaningTaskDto cleaningTaskDto = new CreateCleaningTaskDto
                 {
                     RoomId = room.Id,
-                    Description = $"Post-checkout cleaning for room {room.RoomNumber}",
-                    Status = CleaningRequestStatus.Dirty,
-                    Priority = Priority.High,
-                    CreatedAt = DateTime.UtcNow
-                };
+                    Priority = Priority.Medium,
+                    Description = $"Cleaning task for room {room.RoomNumber} after checkout",
+                    AssignedToId = assignedToId// Assign to a cleaner later
+                }; 
 
-                await _context.CleaningTasks.AddAsync(cleaningTask);
+                await _cleaningTaskService.CreateTaskAsync(cleaningTaskDto);
+
                 await _context.SaveChangesAsync();
                 return true;
             }

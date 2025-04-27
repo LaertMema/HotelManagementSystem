@@ -502,7 +502,7 @@
 
             #region Helper Methods
 
-            private PaymentDto MapToPaymentDto(Models.Payment payment)
+            public static PaymentDto MapToPaymentDto(Models.Payment payment)
             {
                 if (payment == null)
                     return null;
@@ -534,31 +534,34 @@
                 };
             }
 
-            private async Task UpdateInvoiceStatusAsync(int invoiceId)
+        private async Task UpdateInvoiceStatusAsync(int invoiceId)
+        {
+            var invoice = await _context.Invoices
+                .Include(i => i.Payments)
+                .FirstOrDefaultAsync(i => i.Id == invoiceId);
+
+            if (invoice == null)
+                return;
+
+            var totalPaid = invoice.Payments
+                .Where(p => !p.IsRefunded)
+                .Sum(p => p.AmountPaid);
+
+            // Update payment status using isPaid property
+            if (totalPaid >= invoice.Total)
             {
-                var invoice = await _context.Invoices
-                    .Include(i => i.Payments)
-                    .FirstOrDefaultAsync(i => i.Id == invoiceId);
-
-                if (invoice == null)
-                    return;
-
-                var totalPaid = invoice.Payments
-                    .Where(p => !p.IsRefunded)
-                    .Sum(p => p.AmountPaid);
-
-                // Update PaidAt timestamp if appropriate
-                if (totalPaid >= invoice.Total && !invoice.PaidAt.HasValue)
-                {
-                    invoice.PaidAt = DateTime.UtcNow;
-                }
-                else if (totalPaid < invoice.Total && invoice.PaidAt.HasValue)
-                {
-                    invoice.PaidAt = null;
-                }
+                invoice.isPaid = true;
+                invoice.PaidAt = DateTime.UtcNow;
             }
+            else
+            {
+                invoice.isPaid = false;
+                invoice.PaidAt = null;
+            }
+        }
 
-            private bool ValidateCreditCardDetails(string cardNumber, string cardHolderName, string expiryDate, string cvv)
+
+        private bool ValidateCreditCardDetails(string cardNumber, string cardHolderName, string expiryDate, string cvv)
             {
                 // This is a simplified validation. In a real application, you would use a payment gateway
                 // or a credit card validation library with proper security measures

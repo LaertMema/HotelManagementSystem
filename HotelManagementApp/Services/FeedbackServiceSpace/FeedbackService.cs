@@ -1,6 +1,11 @@
 ﻿using HotelManagementApp.Models;
+using HotelManagementApp.Models.DTOs;
+using HotelManagementApp.Models.DTOs.HotelManagement.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
-
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace HotelManagementApp.Services.FeedbackServiceSpace
 {
@@ -16,16 +21,18 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
         }
 
         // CRUD operations
-        public async Task<IEnumerable<Feedback>> GetAllFeedbackAsync()
+        public async Task<IEnumerable<FeedbackDto>> GetAllFeedbackAsync()
         {
             try
             {
-                return await _context.Feedback
+                var feedbacks = await _context.Feedback
                     .Include(f => f.User)
                     .Include(f => f.Reservation)
                     .Include(f => f.ResolvedBy)
                     .OrderByDescending(f => f.CreatedAt)
                     .ToListAsync();
+
+                return feedbacks.ToFeedbackDtos();
             }
             catch (Exception ex)
             {
@@ -34,15 +41,17 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
             }
         }
 
-        public async Task<Feedback> GetFeedbackByIdAsync(int id)
+        public async Task<FeedbackDto> GetFeedbackByIdAsync(int id)
         {
             try
             {
-                return await _context.Feedback
+                var feedback = await _context.Feedback
                     .Include(f => f.User)
                     .Include(f => f.Reservation)
                     .Include(f => f.ResolvedBy)
                     .FirstOrDefaultAsync(f => f.Id == id);
+
+                return feedback?.ToFeedbackDto();
             }
             catch (Exception ex)
             {
@@ -51,46 +60,43 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
             }
         }
 
-        public async Task<Feedback> CreateFeedbackAsync(Feedback feedback)
+        public async Task<FeedbackDto> CreateFeedbackAsync(CreateFeedbackDto feedbackDto, int? userId)
         {
             try
             {
-                // Set creation date if not provided
-                if (feedback.CreatedAt == default)
+                // Validate reservation if provided
+                if (feedbackDto.ReservationId.HasValue)
                 {
-                    feedback.CreatedAt = DateTime.UtcNow;
+                    var reservation = await _context.Reservations.FindAsync(feedbackDto.ReservationId.Value);
+                    if (reservation == null)
+                    {
+                        throw new KeyNotFoundException($"Reservation with ID {feedbackDto.ReservationId.Value} not found");
+                    }
                 }
 
                 // Validate user if provided
-                if (feedback.UserId.HasValue)
+                if (userId.HasValue)
                 {
-                    var user = await _context.Users.FindAsync(feedback.UserId.Value);
+                    var user = await _context.Users.FindAsync(userId.Value);
                     if (user == null)
                     {
-                        throw new KeyNotFoundException($"User with ID {feedback.UserId.Value} not found");
+                        throw new KeyNotFoundException($"User with ID {userId.Value} not found");
                     }
                 }
 
-                // Validate reservation if provided
-                if (feedback.ReservationId.HasValue)
-                {
-                    var reservation = await _context.Reservations.FindAsync(feedback.ReservationId.Value);
-                    if (reservation == null)
-                    {
-                        throw new KeyNotFoundException($"Reservation with ID {feedback.ReservationId.Value} not found");
-                    }
-                }
-
-                // Initialize IsResolved to false for new feedback
-                feedback.IsResolved = false;
-                feedback.ResolvedById = null;
-                feedback.ResolvedAt = null;
-                feedback.ResolutionNotes = null;
+                // Convert DTO to entity
+                var feedback = feedbackDto.ToFeedbackModel(userId);
 
                 await _context.Feedback.AddAsync(feedback);
                 await _context.SaveChangesAsync();
 
-                return feedback;
+                // Retrieve the saved feedback with includes
+                var savedFeedback = await _context.Feedback
+                    .Include(f => f.User)
+                    .Include(f => f.Reservation)
+                    .FirstOrDefaultAsync(f => f.Id == feedback.Id);
+
+                return savedFeedback.ToFeedbackDto();
             }
             catch (Exception ex)
             {
@@ -99,43 +105,34 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
             }
         }
 
-        public async Task<Feedback> UpdateFeedbackAsync(Feedback feedback)
+        public async Task<FeedbackDto> UpdateFeedbackAsync(int id, UpdateFeedbackDto feedbackDto)
         {
             try
             {
-                var existingFeedback = await _context.Feedback.FindAsync(feedback.Id);
+                var existingFeedback = await _context.Feedback.FindAsync(id);
                 if (existingFeedback == null)
                 {
-                    throw new KeyNotFoundException($"Feedback with ID {feedback.Id} not found");
+                    throw new KeyNotFoundException($"Feedback with ID {id} not found");
                 }
 
-                // Preserve original creation date and resolved status information
-                feedback.CreatedAt = existingFeedback.CreatedAt;
+                // Apply updates to the entity
+                existingFeedback.ApplyUpdateFeedbackDto(feedbackDto);
 
-                // Only allow resolution status to be changed through the ResolveFeedback method
-                if (!existingFeedback.IsResolved)
-                {
-                    feedback.IsResolved = false;
-                    feedback.ResolvedById = null;
-                    feedback.ResolvedAt = null;
-                    feedback.ResolutionNotes = null;
-                }
-                else
-                {
-                    feedback.IsResolved = existingFeedback.IsResolved;
-                    feedback.ResolvedById = existingFeedback.ResolvedById;
-                    feedback.ResolvedAt = existingFeedback.ResolvedAt;
-                    feedback.ResolutionNotes = existingFeedback.ResolutionNotes;
-                }
-
-                _context.Entry(existingFeedback).CurrentValues.SetValues(feedback);
+                _context.Feedback.Update(existingFeedback);
                 await _context.SaveChangesAsync();
 
-                return await GetFeedbackByIdAsync(feedback.Id);
+                // Retrieve the updated feedback with includes
+                var updatedFeedback = await _context.Feedback
+                    .Include(f => f.User)
+                    .Include(f => f.Reservation)
+                    .Include(f => f.ResolvedBy)
+                    .FirstOrDefaultAsync(f => f.Id == id);
+
+                return updatedFeedback.ToFeedbackDto();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating feedback with ID {FeedbackId}", feedback.Id);
+                _logger.LogError(ex, "Error updating feedback with ID {FeedbackId}", id);
                 throw;
             }
         }
@@ -162,87 +159,19 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
         }
 
         // Specialized operations
-        public async Task<IEnumerable<Feedback>> GetUnresolvedFeedbackAsync()
+        public async Task<IEnumerable<FeedbackDto>> GetFeedbackByUserAsync(int userId)
         {
             try
             {
-                return await _context.Feedback
+                var feedbacks = await _context.Feedback
                     .Include(f => f.User)
-                    .Include(f => f.Reservation)
-                    .Where(f => !f.IsResolved)
-                    .OrderByDescending(f => f.CreatedAt)
-                    .ToListAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving unresolved feedback");
-                throw;
-            }
-        }
-
-        public async Task<IEnumerable<Feedback>> GetFeedbackByRatingAsync(int rating)
-        {
-            try
-            {
-                if (rating < 1 || rating > 5)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(rating), "Rating must be between 1 and 5");
-                }
-
-                return await _context.Feedback
-                    .Include(f => f.User)
-                    .Include(f => f.Reservation)
-                    .Include(f => f.ResolvedBy)
-                    .Where(f => f.Rating == rating)
-                    .OrderByDescending(f => f.CreatedAt)
-                    .ToListAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving feedback with rating {Rating}", rating);
-                throw;
-            }
-        }
-
-        public async Task<IEnumerable<Feedback>> GetFeedbackByCategoryAsync(string category)
-        {
-            try
-            {
-                return await _context.Feedback
-                    .Include(f => f.User)
-                    .Include(f => f.Reservation)
-                    .Include(f => f.ResolvedBy)
-                    .Where(f => f.Category == category)
-                    .OrderByDescending(f => f.CreatedAt)
-                    .ToListAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving feedback with category {Category}", category);
-                throw;
-            }
-        }
-
-        public async Task<IEnumerable<Feedback>> GetFeedbackByDateRangeAsync(DateTime start, DateTime end)
-        {
-            return await _context.Feedback
-                .Include(f => f.User)
-                .Include(f => f.Reservation)
-                .Where(f => f.CreatedAt >= start && f.CreatedAt <= end)
-                .OrderByDescending(f => f.CreatedAt)
-                .ToListAsync();
-        }
-
-        public async Task<IEnumerable<Feedback>> GetFeedbackByUserAsync(int userId)
-        {
-            try
-            {
-                return await _context.Feedback
                     .Include(f => f.Reservation)
                     .Include(f => f.ResolvedBy)
                     .Where(f => f.UserId == userId)
                     .OrderByDescending(f => f.CreatedAt)
                     .ToListAsync();
+
+                return feedbacks.ToFeedbackDtos();
             }
             catch (Exception ex)
             {
@@ -251,16 +180,19 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
             }
         }
 
-        public async Task<IEnumerable<Feedback>> GetFeedbackByReservationAsync(int reservationId)
+        public async Task<IEnumerable<FeedbackDto>> GetFeedbackByReservationAsync(int reservationId)
         {
             try
             {
-                return await _context.Feedback
+                var feedbacks = await _context.Feedback
                     .Include(f => f.User)
+                    .Include(f => f.Reservation)
                     .Include(f => f.ResolvedBy)
                     .Where(f => f.ReservationId == reservationId)
                     .OrderByDescending(f => f.CreatedAt)
                     .ToListAsync();
+
+                return feedbacks.ToFeedbackDtos();
             }
             catch (Exception ex)
             {
@@ -269,8 +201,94 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
             }
         }
 
+        public async Task<IEnumerable<FeedbackDto>> GetFeedbackByRatingAsync(int rating)
+        {
+            try
+            {
+                if (rating < 1 || rating > 5)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(rating), "Rating must be between 1 and 5");
+                }
+
+                var feedbacks = await _context.Feedback
+                    .Include(f => f.User)
+                    .Include(f => f.Reservation)
+                    .Include(f => f.ResolvedBy)
+                    .Where(f => f.Rating == rating)
+                    .OrderByDescending(f => f.CreatedAt)
+                    .ToListAsync();
+
+                return feedbacks.ToFeedbackDtos();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving feedback with rating {Rating}", rating);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<FeedbackDto>> GetFeedbackByCategoryAsync(string category)
+        {
+            try
+            {
+                var feedbacks = await _context.Feedback
+                    .Include(f => f.User)
+                    .Include(f => f.Reservation)
+                    .Include(f => f.ResolvedBy)
+                    .Where(f => f.Category == category)
+                    .OrderByDescending(f => f.CreatedAt)
+                    .ToListAsync();
+
+                return feedbacks.ToFeedbackDtos();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving feedback with category {Category}", category);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<FeedbackDto>> GetFeedbackByResolutionStatusAsync(bool isResolved)
+        {
+            try
+            {
+                var feedbacks = await _context.Feedback
+                    .Include(f => f.User)
+                    .Include(f => f.Reservation)
+                    .Include(f => f.ResolvedBy)
+                    .Where(f => f.IsResolved == isResolved)
+                    .OrderByDescending(f => f.CreatedAt)
+                    .ToListAsync();
+
+                return feedbacks.ToFeedbackDtos();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving feedback with resolution status {IsResolved}", isResolved);
+                throw;
+            }
+        }
+
+        // Reservation verification for authorization checks
+        public async Task<ReservationDto> GetReservationByIdAsync(int reservationId)
+        {
+            try
+            {
+                var reservation = await _context.Reservations
+                    .Include(r => r.User)
+                    .FirstOrDefaultAsync(r => r.Id == reservationId);
+
+                return reservation?.ToReservationDto();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving reservation with ID {ReservationId}", reservationId);
+                throw;
+            }
+        }
+
         // Business operations
-        public async Task<Feedback> ResolveFeedbackAsync(int id, string resolutionNotes, int resolvedById)
+        public async Task<FeedbackDto> ResolveFeedbackAsync(int id, string resolutionNotes, int resolvedById)
         {
             try
             {
@@ -295,11 +313,67 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
 
                 await _context.SaveChangesAsync();
 
-                return await GetFeedbackByIdAsync(id);
+                // Retrieve the resolved feedback with includes
+                var resolvedFeedback = await _context.Feedback
+                    .Include(f => f.User)
+                    .Include(f => f.Reservation)
+                    .Include(f => f.ResolvedBy)
+                    .FirstOrDefaultAsync(f => f.Id == id);
+
+                return resolvedFeedback.ToFeedbackDto();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error resolving feedback with ID {FeedbackId}", id);
+                throw;
+            }
+        }
+
+        public async Task<FeedbackStatsByCategoryDto> GetFeedbackStatsByCategoryAsync()
+        {
+            try
+            {
+                var categoryCounts = await _context.Feedback
+                    .Where(f => !string.IsNullOrEmpty(f.Category))
+                    .GroupBy(f => f.Category)
+                    .Select(g => new { Category = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.Category, x => x.Count);
+
+                return categoryCounts.ToFeedbackStatsByCategoryDto();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving feedback statistics by category");
+                throw;
+            }
+        }
+
+        public async Task<FeedbackStatsByRatingDto> GetFeedbackStatsByRatingAsync()
+        {
+            try
+            {
+                var ratingCounts = await _context.Feedback
+                    .GroupBy(f => f.Rating)
+                    .Select(g => new { Rating = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.Rating, x => x.Count);
+
+                // Ensure all ratings 1-5 are represented
+                for (int i = 1; i <= 5; i++)
+                {
+                    if (!ratingCounts.ContainsKey(i))
+                    {
+                        ratingCounts.Add(i, 0);
+                    }
+                }
+
+                // Calculate average rating
+                var avgRating = await GetAverageRatingAsync();
+
+                return ratingCounts.ToFeedbackStatsByRatingDto(avgRating);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving feedback statistics by rating");
                 throw;
             }
         }
@@ -337,51 +411,6 @@ namespace HotelManagementApp.Services.FeedbackServiceSpace
                 throw;
             }
         }
-
-        public async Task<Dictionary<string, int>> GetFeedbackStatsByCategoryAsync()
-        {
-            try
-            {
-                var categoryCounts = await _context.Feedback
-                    .Where(f => !string.IsNullOrEmpty(f.Category))
-                    .GroupBy(f => f.Category)
-                    .Select(g => new { Category = g.Key, Count = g.Count() })
-                    .ToDictionaryAsync(x => x.Category, x => x.Count);
-
-                return categoryCounts;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving feedback statistics by category");
-                throw;
-            }
-        }
-
-        public async Task<Dictionary<int, int>> GetFeedbackStatsByRatingAsync()
-        {
-            try
-            {
-                var ratingCounts = await _context.Feedback
-                    .GroupBy(f => f.Rating)
-                    .Select(g => new { Rating = g.Key, Count = g.Count() })
-                    .ToDictionaryAsync(x => x.Rating, x => x.Count);
-
-                // Ensure all ratings 1-5 are represented
-                for (int i = 1; i <= 5; i++)
-                {
-                    if (!ratingCounts.ContainsKey(i))
-                    {
-                        ratingCounts.Add(i, 0);
-                    }
-                }
-
-                return ratingCounts;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving feedback statistics by rating");
-                throw;
-            }
-        }
     }
 }
+

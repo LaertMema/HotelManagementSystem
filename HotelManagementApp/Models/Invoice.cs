@@ -12,10 +12,11 @@ namespace HotelManagementApp.Models
     public decimal Tax { get; set; }
     public decimal Total { get; set; } // Final amount including tax
     public DateTime CreatedAt { get; set; }
-    public DateTime? PaidAt { get; set; }
+    public DateTime? PaidAt { get; set; }  
+    public Boolean isPaid { get; set; } = false; // Indicates if the invoice is paid
 
-    // Navigation property for multiple payments
-    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+        // Navigation property for multiple payments
+        public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
         // Payment Status: Dynamically determined based on payments
         public PaymentStatus Status

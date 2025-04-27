@@ -55,6 +55,7 @@
         {
             [StringLength(500)]
             public string Notes { get; set; }
+            public int RoomId { get; set; }
         }
 
         public class CheckOutDto
