@@ -50,6 +50,11 @@
 
         [Required]
         public string Role { get; set; }
+        [StringLength(50)]
+        public string IdType { get; set; }
+
+        [StringLength(50)]
+        public string IdNumber { get; set; }
     }
 
     public class UpdateUserDto
@@ -85,6 +90,11 @@
         [StringLength(100, MinimumLength = 6)]
         [DataType(DataType.Password)]
         public string Password { get; set; }
+        [StringLength(50)]
+        public string IdType { get; set; }
+
+        [StringLength(50)]
+        public string IdNumber { get; set; }
     }
 
     public class UserListItemDto

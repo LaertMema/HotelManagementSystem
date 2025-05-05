@@ -94,7 +94,7 @@
                         CreatedAt = DateTime.UtcNow,
                         AssignedToId = taskDto.AssignedToId ?? 0, // 0 means unassigned
                         CompletedAt = null,
-                        CompletionNotes = null
+                        CompletionNotes = ""
                     };
 
                     // If assigned to someone, validate user
@@ -457,7 +457,7 @@
                         RoomId = roomId,
                         Description = description ?? $"Cleaning for Room {room.RoomNumber}",
                         Status = CleaningRequestStatus.Dirty,
-                        Priority = priority
+                        Priority = priority,
                     };
 
                     return await CreateTaskAsync(taskDto);

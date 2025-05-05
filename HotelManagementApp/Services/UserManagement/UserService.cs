@@ -148,6 +148,13 @@
                 if (!string.IsNullOrEmpty(createUserDto.PostalCode))
                     user.PostalCode = createUserDto.PostalCode;
 
+                // Add these new assignments
+                if (!string.IsNullOrEmpty(createUserDto.IdType))
+                    user.IdType = createUserDto.IdType;
+
+                if (!string.IsNullOrEmpty(createUserDto.IdNumber))
+                    user.IdNumber = createUserDto.IdNumber;
+
                 // Create the user with password
                 var result = await _userManager.CreateAsync(user, createUserDto.Password);
 
@@ -221,6 +228,11 @@
 
                 if (!string.IsNullOrEmpty(updateUserDto.PostalCode))
                     user.PostalCode = updateUserDto.PostalCode;
+                if (!string.IsNullOrEmpty(updateUserDto.IdType))
+                    user.IdType = updateUserDto.IdType;
+
+                if (!string.IsNullOrEmpty(updateUserDto.IdNumber))
+                    user.IdNumber = updateUserDto.IdNumber;
 
                 // Save user changes
                 var result = await _userManager.UpdateAsync(user);

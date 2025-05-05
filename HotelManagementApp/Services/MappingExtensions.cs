@@ -143,7 +143,9 @@
                 Role = role,
                 IsActive = user.IsActive,
                 Created = user.Created,
-                LastLogin = user.LastLogin
+                LastLogin = user.LastLogin,
+                IdType = user.IdType,
+                IdNumber = user.IdNumber
             };
         }
         public static string ToRoleString(this IList<string> roles)

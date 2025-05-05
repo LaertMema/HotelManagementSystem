@@ -5,19 +5,27 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
+
 namespace HotelManagementApp.Services.Authentication
 {
     public class AuthenticationService : IAuthenticationService
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly RoleManager<ApplicationRole> _roleManager;
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AuthenticationService(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
+        public AuthenticationService(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+            RoleManager<ApplicationRole> roleManager,
+            IConfiguration configuration,
+            IHttpContextAccessor httpContextAccessor)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _roleManager = roleManager;
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
         }
@@ -30,8 +38,18 @@ namespace HotelManagementApp.Services.Authentication
                 return null;
             }
             //No null check required signInManager will throw exception if user is not found
-            return await _userManager.FindByNameAsync(username);
+            var user = await _userManager.FindByNameAsync(username);
+
+            // Update LastLogin time
+            if (user != null)
+            {
+                user.LastLogin = DateTime.UtcNow;
+                await _userManager.UpdateAsync(user);
+            }
+
+            return user;
         }
+
         public async Task<bool> LogoutAsync()
         {
             await _signInManager.SignOutAsync();
@@ -41,6 +59,10 @@ namespace HotelManagementApp.Services.Authentication
         public async Task<ApplicationUser> GetCurrentUserAsync()
         {
             var userId = _userManager.GetUserId(_httpContextAccessor.HttpContext.User);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return null;
+            }
             return await _userManager.FindByIdAsync(userId);
         }
 
@@ -55,7 +77,7 @@ namespace HotelManagementApp.Services.Authentication
             var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
             return result.Succeeded;
         }
-        //For testing purpose
+
         public async Task<bool> ResetPasswordAsync(string email)
         {
             var user = await _userManager.FindByEmailAsync(email);
@@ -66,32 +88,87 @@ namespace HotelManagementApp.Services.Authentication
 
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-            //Email the token to the user but for testing purpose we are resetting the password
+            // For a real application, you would email the token to the user
+            // For testing purposes, we're resetting to a default password
             var result = await _userManager.ResetPasswordAsync(user, token, "Password@123");
+
+            if (result.Succeeded)
+            {
+                user.PasswordResetRequired = true;
+                await _userManager.UpdateAsync(user);
+            }
+
             return result.Succeeded;
         }
 
         public async Task<bool> RegisterUserAsync(ApplicationUser user, string password)
         {
+            // Set default values for new users
+            user.IsActive = true;
+            user.AccountStatus = Models.Enums.AccountStatus.Active;
+            user.RegistrationDate = DateTime.UtcNow;
+            user.Created = DateTime.UtcNow;
+            user.PasswordResetRequired = false;
+
+            // Create the user with password
             var result = await _userManager.CreateAsync(user, password);
-            return result.Succeeded;
+            if (!result.Succeeded)
+            {
+                return false;
+            }
+
+            // Assign default role (Guest) to new users
+            const string defaultRole = "Guest";
+
+            // Check if role exists, create it if it doesn't
+            var roleExists = await _roleManager.RoleExistsAsync(defaultRole);
+            if (!roleExists)
+            {
+                // Create the Guest role if it doesn't exist
+                await _roleManager.CreateAsync(new ApplicationRole
+                {
+                    Name = defaultRole,
+                    NormalizedName = defaultRole.ToUpper(),
+                    Description = "Hotel guest with booking capabilities"
+                });
+            }
+
+            // Assign the role to the user
+            await _userManager.AddToRoleAsync(user, defaultRole);
+
+            return true;
         }
+
         public async Task<string> GenerateJwtTokenAsync(ApplicationUser user)
         {
-            var claims = new[]
+            // Get user roles for claims
+            var userRoles = await _userManager.GetRolesAsync(user);
+
+            var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.NameId, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.UserName)
             };
+
+            // Add role claims
+            foreach (var role in userRoles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            // Set token expiration (1 hour)
+            var expiration = DateTime.UtcNow.AddHours(1);
 
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddHours(1),
+                expires: expiration,
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
@@ -111,7 +188,8 @@ namespace HotelManagementApp.Services.Authentication
                     ValidateAudience = true,
                     ValidIssuer = _configuration["Jwt:Issuer"],
                     ValidAudience = _configuration["Jwt:Audience"],
-                    ValidateLifetime = true
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero // Set to zero for exact expiration time
                 }, out SecurityToken validatedToken);
 
                 return true;
@@ -121,7 +199,6 @@ namespace HotelManagementApp.Services.Authentication
                 return false;
             }
         }
-
-
     }
 }
+

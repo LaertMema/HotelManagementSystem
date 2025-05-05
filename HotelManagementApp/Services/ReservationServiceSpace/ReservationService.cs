@@ -96,9 +96,11 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 // Set status to Reserved
                 reservation.Status = ReservationStatus.Reserved;
                 // Create an invoice for the reservation
+                // Create an invoice for the reservation
                 var invoice = new Invoice
                 {
                     Reservation = reservation,
+                    InvoiceNumber = await _invoiceService.GenerateInvoiceNumberAsync(), //generates number
                     Amount = reservation.TotalPrice,
                     Tax = reservation.TotalPrice * 0.1m, // Assuming a 10% tax rate
                     Total = reservation.TotalPrice * 1.1m, // Total amount including tax
@@ -106,6 +108,7 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 };
 
                 reservation.Invoices = new List<Invoice> { invoice };
+
 
 
                 // Set creation date
@@ -186,18 +189,27 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
 
         public async Task<bool> DeleteReservationAsync(int id)
         {
-            var reservation = await _context.Reservations.FindAsync(id);
+            var reservation = await _context.Reservations
+                .Include(r => r.Invoices) // Ensure Invoices are included
+                .FirstOrDefaultAsync(r => r.Id == id);
+
             if (reservation == null)
             {
                 return false;
             }
 
             _context.Reservations.Remove(reservation);
-            // Delete all associated invoices ( e shtova une dhe ketu per siguri)
-            _context.Invoices.RemoveRange(reservation.Invoices);
+
+            // Delete all associated invoices (only if there are any)
+            if (reservation.Invoices != null && reservation.Invoices.Any())
+            {
+                _context.Invoices.RemoveRange(reservation.Invoices);
+            }
+
             await _context.SaveChangesAsync();
             return true;
         }
+
 
         // Specialized operations
         public async Task<IEnumerable<Reservation>> GetReservationsByUserAsync(int userId)
@@ -317,7 +329,11 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
         {
             try
             {
-                var reservation = await _context.Reservations.FindAsync(id);
+                // Include invoices when fetching the reservation
+                var reservation = await _context.Reservations
+                    .Include(r => r.Invoices)
+                    .FirstOrDefaultAsync(r => r.Id == id);
+
                 if (reservation == null)
                 {
                     return false;
@@ -332,8 +348,12 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 reservation.Status = ReservationStatus.Cancelled;
                 reservation.CancellationReason = $"Cancellation reason: {reason}. Cancelled on {DateTime.UtcNow}";
                 reservation.CancelledAt = DateTime.UtcNow;
-                // Delete all associated invoices
-                _context.Invoices.RemoveRange(reservation.Invoices);
+
+                // Delete all associated invoices (only if there are any)
+                if (reservation.Invoices != null && reservation.Invoices.Any())
+                {
+                    _context.Invoices.RemoveRange(reservation.Invoices);
+                }
 
                 await _context.SaveChangesAsync();
                 return true;
@@ -344,6 +364,7 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 throw;
             }
         }
+
 
         public async Task<bool> CheckInAsync(int id,int roomId, int receptionistId)
         {

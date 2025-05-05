@@ -130,6 +130,8 @@
         public bool IsActive { get; set; }
         public DateTime Created { get; set; }
         public DateTime? LastLogin { get; set; }
+        public string IdType { get; set; }
+        public string IdNumber { get; set; }
     }
 }
 

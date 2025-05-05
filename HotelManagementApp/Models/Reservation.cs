@@ -16,7 +16,7 @@ namespace HotelManagementApp.Models
         public PaymentMethod PaymentMethod { get; set; } // Use Enum
         public PaymentStatus PaymentStatus { get; set; } // Use Enum
         public int NumberOfGuests { get; set; }
-        public string SpecialRequests { get; set; }
+        public string ?SpecialRequests { get; set; }
 
         // Room Information
         public int? RoomId { get; set; } // Nullable for unassigned rooms
@@ -37,7 +37,7 @@ namespace HotelManagementApp.Models
 
         // Cancellation Tracking
         public DateTime? CancelledAt { get; set; }
-        public string CancellationReason { get; set; }
+        public string ? CancellationReason { get; set; }
 
         // Relationships
         public ICollection<ServiceOrder> ServiceOrders { get; set; }

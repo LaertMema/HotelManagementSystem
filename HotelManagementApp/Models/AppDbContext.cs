@@ -217,10 +217,10 @@ namespace HotelManagementApp.Models
         {
             // Seed Roles
             modelBuilder.Entity<ApplicationRole>().HasData(
-                new ApplicationRole { Id = 1, Name = "Manager", Description = "Hotel management and administrative access" },
-                new ApplicationRole { Id = 2, Name = "Receptionist", Description = "Front desk operations and guest services" },
-                new ApplicationRole { Id = 3, Name = "Housekeeper", Description = "Room cleaning and maintenance" },
-                new ApplicationRole { Id = 4, Name = "Guest", Description = "Hotel guest with booking capabilities" }
+                new ApplicationRole { Id = 1, Name = "Manager", NormalizedName = "MANAGER", Description = "Hotel management and administrative access" },
+                new ApplicationRole { Id = 2, Name = "Receptionist", NormalizedName = "RECEPTIONIST", Description = "Front desk operations and guest services" },
+                new ApplicationRole { Id = 3, Name = "Housekeeper", NormalizedName = "HOUSEKEEPER",Description = "Room cleaning and maintenance" },
+                new ApplicationRole { Id = 4, Name = "Guest", NormalizedName = "GUEST",Description = "Hotel guest with booking capabilities" }
             );
 
             // Seed RoomTypes
@@ -266,7 +266,7 @@ namespace HotelManagementApp.Models
                     ImageUrl = "img/room-presidential.jpg"
                 }
             );
-
+            
             // Seed Sample Feedback
             modelBuilder.Entity<Feedback>().HasData(
                 new Feedback
@@ -307,7 +307,8 @@ namespace HotelManagementApp.Models
                     Comments = "Great stay overall, but would appreciate more variety in the breakfast menu.",
                     Category = "Food",
                     IsResolved = false,
-                    CreatedAt = DateTime.Parse("2023-04-20")
+                    CreatedAt = DateTime.Parse("2023-04-20"),
+                    ResolutionNotes= "Updated menu to include more options"
                 }
             );
         }
