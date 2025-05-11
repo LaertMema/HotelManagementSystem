@@ -40,16 +40,16 @@
                         .CountAsync(r => r.ReservationDate.Date == today);
 
                     var todayArrivals = await _context.Reservations
-                        .CountAsync(r => r.CheckInDate.Date == today && r.Status == ReservationStatus.Reserved);
+                        .CountAsync(r => r.CheckInDate.Date == today && r.Status == ReservationStatus.Confirmed);
 
                     var todayDepartures = await _context.Reservations
                         .CountAsync(r => r.CheckOutDate.Date == today && r.Status == ReservationStatus.CheckedIn);
 
                     var activeReservations = await _context.Reservations
-                        .CountAsync(r => r.Status == ReservationStatus.Reserved || r.Status == ReservationStatus.CheckedIn);
+                        .CountAsync(r => r.Status == ReservationStatus.Confirmed || r.Status == ReservationStatus.CheckedIn);
 
                     var pendingReservations = await _context.Reservations
-                        .CountAsync(r => r.Status == ReservationStatus.Reserved);
+                        .CountAsync(r => r.Status == ReservationStatus.Confirmed);
 
                     var checkedInReservations = await _context.Reservations
                         .CountAsync(r => r.Status == ReservationStatus.CheckedIn);
@@ -59,7 +59,7 @@
                         .SumAsync(r => r.NumberOfGuests);
 
                     var expectedArrivals = await _context.Reservations
-                        .CountAsync(r => r.CheckInDate > today && r.CheckInDate <= nextWeek && r.Status == ReservationStatus.Reserved);
+                        .CountAsync(r => r.CheckInDate > today && r.CheckInDate <= nextWeek && r.Status == ReservationStatus.Confirmed);
 
                     // Maintenance and cleaning statistics
                     var pendingMaintenance = await _context.MaintenanceRequests
@@ -493,7 +493,7 @@
                 // Get confirmed reservations with their daily rates
                 var reservations = await _context.Reservations
                     .Where(r =>
-                        (r.Status == ReservationStatus.Reserved || r.Status == ReservationStatus.CheckedIn) &&
+                        (r.Status == ReservationStatus.Confirmed || r.Status == ReservationStatus.CheckedIn) &&
                         ((r.CheckInDate >= startDate && r.CheckInDate <= endDate) ||
                          (r.CheckOutDate >= startDate && r.CheckOutDate <= endDate) ||
                          (r.CheckInDate <= startDate && r.CheckOutDate >= endDate)))

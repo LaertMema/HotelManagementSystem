@@ -218,20 +218,30 @@
             {
                 return new Reservation
                 {
-                    ReservationNumber = reservationNumber,
+                    //ReservationNumber = reservationNumber,
+                    //UserId = userId,
+                    //ReservationDate = DateTime.UtcNow,
+                    //CheckInDate = dto.CheckInDate,
+                    //CheckOutDate = dto.CheckOutDate,
+                    //Status = ReservationStatus.Confirmed,
+                    //TotalPrice = totalPrice,
+                    //PaymentMethod = dto.PaymentMethod,
+                    //PaymentStatus = PaymentStatus.Pending,
+                    //NumberOfGuests = dto.NumberOfGuests,
+                    //SpecialRequests = dto.SpecialRequests,
+                    //RoomId = null, // Room will be assigned later
+                    //RoomTypeId = dto.RoomTypeId,
+                    //CreatedBy = userId
                     UserId = userId,
-                    ReservationDate = DateTime.UtcNow,
+                    ReservationNumber = reservationNumber,
                     CheckInDate = dto.CheckInDate,
                     CheckOutDate = dto.CheckOutDate,
-                    Status = ReservationStatus.Pending,
-                    TotalPrice = totalPrice,
-                    PaymentMethod = dto.PaymentMethod,
-                    PaymentStatus = PaymentStatus.Pending,
+                    RoomTypeId = dto.RoomTypeId,
                     NumberOfGuests = dto.NumberOfGuests,
                     SpecialRequests = dto.SpecialRequests,
-                    RoomId = null, // Room will be assigned later
-                    RoomTypeId = dto.RoomTypeId,
-                    CreatedBy = userId
+                    PaymentMethod = dto.PaymentMethod,
+                    Status = ReservationStatus.Confirmed, // Changed from Confirmed to Reserved to match service
+                    ReservationDate = DateTime.UtcNow
                 };
             }
 

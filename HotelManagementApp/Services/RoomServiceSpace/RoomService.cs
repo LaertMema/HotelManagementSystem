@@ -199,7 +199,7 @@ namespace HotelManagementApp.Services.RoomServiceSpace
                     // Check if room has active reservations
                     bool hasActiveReservations = await _context.Reservations
                         .AnyAsync(r => r.RoomId == id &&
-                                       (r.Status == ReservationStatus.Reserved ||
+                                       (r.Status == ReservationStatus.Confirmed ||
                                         r.Status == ReservationStatus.CheckedIn));
 
                     if (hasActiveReservations)
@@ -407,7 +407,7 @@ namespace HotelManagementApp.Services.RoomServiceSpace
                     {
                         bool hasActiveReservations = await _context.Reservations
                             .AnyAsync(r => r.RoomId == roomId &&
-                                          (r.Status == ReservationStatus.Reserved ||
+                                          (r.Status == ReservationStatus.Confirmed ||
                                            r.Status == ReservationStatus.CheckedIn));
 
                         if (hasActiveReservations)
@@ -669,7 +669,7 @@ namespace HotelManagementApp.Services.RoomServiceSpace
 
                     // Statistics
                     ActiveReservationsCount = room.Reservations?.Count(r =>
-                        r.Status == ReservationStatus.Reserved ||
+                        r.Status == ReservationStatus.Confirmed ||
                         r.Status == ReservationStatus.CheckedIn) ?? 0,
                     PendingCleaningTasksCount = room.CleaningTasks?.Count(t =>
                         t.Status == CleaningRequestStatus.Dirty ||

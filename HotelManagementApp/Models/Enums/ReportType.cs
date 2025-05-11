@@ -4,6 +4,8 @@
     {
         Occupancy,
         Revenue,
-        Maintenance
+        Maintenance,
+        Staff,
+        Guest
     }
 }

@@ -100,6 +100,8 @@
                         OrderDateTime = DateTime.UtcNow,
                         Quantity = serviceOrderDto.Quantity,
                         Status = ServiceOrderStatus.Pending,
+                        PriceCharged = service.Price, //Adding this line to set the price
+                        TotalPrice = service.Price * serviceOrderDto.Quantity, //Adding this line to calculate total
                         SpecialInstructions = serviceOrderDto.SpecialInstructions,
                         ScheduledTime = serviceOrderDto.ScheduledTime,
                         DeliveryLocation = serviceOrderDto.DeliveryLocation ?? reservation.Room?.RoomNumber
@@ -167,17 +169,20 @@
                         serviceOrder.CompletedAt = serviceOrderDto.CompletedAt;
                     }
 
-                    //if (serviceOrderDto.ScheduledTime.HasValue)
-                    //{
-                    //    serviceOrder.ScheduledTime = serviceOrderDto.ScheduledTime;
-                    //}
+                if (serviceOrderDto.ScheduledTime.HasValue)
+                {
+                    serviceOrder.ScheduledTime = serviceOrderDto.ScheduledTime;
+                }
 
-                    //if (!string.IsNullOrEmpty(serviceOrderDto.DeliveryLocation))
-                    //{
-                    //    serviceOrder.DeliveryLocation = serviceOrderDto.DeliveryLocation;
-                    //}
-
-                    await _context.SaveChangesAsync();
+                if (!string.IsNullOrEmpty(serviceOrderDto.DeliveryLocation))
+                {
+                    serviceOrder.DeliveryLocation = serviceOrderDto.DeliveryLocation;
+                }
+                if (!string.IsNullOrEmpty(serviceOrderDto.CompletionNotes))
+                {
+                    serviceOrder.CompletionNotes = serviceOrderDto.CompletionNotes;
+                }
+                await _context.SaveChangesAsync();
                     return await GetServiceOrderByIdAsync(id);
                 }
                 catch (Exception ex)

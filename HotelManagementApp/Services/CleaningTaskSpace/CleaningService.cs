@@ -66,65 +66,117 @@
                 }
             }
 
-            public async Task<CleaningTaskDto> CreateTaskAsync(CreateCleaningTaskDto taskDto)
+        public async Task<CleaningTaskDto> CreateTaskAsync(CreateCleaningTaskDto taskDto)
+        {
+            try
             {
-                try
+                // Validate room
+                var room = await _context.Rooms
+                    .Include(r => r.RoomType)
+                    .FirstOrDefaultAsync(r => r.Id == taskDto.RoomId);
+
+                if (room == null)
                 {
-                    // Validate room
-                    var room = await _context.Rooms
-                        .Include(r => r.RoomType)
-                        .FirstOrDefaultAsync(r => r.Id == taskDto.RoomId);
-
-                    if (room == null)
-                    {
-                        throw new KeyNotFoundException($"Room with ID {taskDto.RoomId} not found");
-                    }
-
-                    // Generate task ID
-                    string taskId = GenerateTaskId(taskDto.RoomId);
-
-                    // Create cleaning task
-                    var task = new CleaningTask
-                    {
-                        TaskId = taskId,
-                        RoomId = taskDto.RoomId,
-                        Description = taskDto.Description,
-                        Status = taskDto.Status,
-                        Priority = taskDto.Priority,
-                        CreatedAt = DateTime.UtcNow,
-                        AssignedToId = taskDto.AssignedToId ?? 0, // 0 means unassigned
-                        CompletedAt = null,
-                        CompletionNotes = ""
-                    };
-
-                    // If assigned to someone, validate user
-                    if (taskDto.AssignedToId.HasValue && taskDto.AssignedToId.Value > 0)
-                    {
-                        var user = await _context.Users.FindAsync(taskDto.AssignedToId.Value);
-                        if (user == null)
-                        {
-                            throw new KeyNotFoundException($"User with ID {taskDto.AssignedToId.Value} not found");
-                        }
-                        task.AssignedToId = taskDto.AssignedToId.Value;
-                    }
-
-                    // Mark the room as needing cleaning
-                    room.NeedsCleaning = true;
-
-                    // Add task to database
-                    _context.CleaningTasks.Add(task);
-                    await _context.SaveChangesAsync();
-
-                    return await GetTaskByIdAsync(task.Id);
+                    throw new KeyNotFoundException($"Room with ID {taskDto.RoomId} not found");
                 }
-                catch (Exception ex)
+
+                // Generate task ID
+                string taskId = GenerateTaskId(taskDto.RoomId);
+
+                // Create cleaning task
+                var task = new CleaningTask
                 {
-                    _logger.LogError(ex, "Error creating cleaning task for room {RoomId}", taskDto.RoomId);
-                    throw;
+                    TaskId = taskId,
+                    RoomId = taskDto.RoomId,
+                    Description = taskDto.Description,
+                    Status = taskDto.Status,
+                    Priority = taskDto.Priority,
+                    CreatedAt = DateTime.UtcNow,
+                    AssignedToId = taskDto.AssignedToId ?? 0, // 0 means unassigned
+                    CompletedAt = null,
+                    CompletionNotes = "",
+                    Notes = taskDto.Notes
+                };
+
+                // If assigned to someone, validate user
+                if (taskDto.AssignedToId.HasValue && taskDto.AssignedToId.Value > 0)
+                {
+                    var user = await _context.Users.FindAsync(taskDto.AssignedToId.Value);
+                    if (user == null)
+                    {
+                        throw new KeyNotFoundException($"User with ID {taskDto.AssignedToId.Value} not found");
+                    }
+                    task.AssignedToId = taskDto.AssignedToId.Value;
                 }
+                else
+                {
+                    // If not assigned, assign to a random housekeeper
+                    var randomHousekeeper = await AssignRandomHousekeeperAsync();
+                    if (randomHousekeeper > 0)
+                    {
+                        task.AssignedToId = randomHousekeeper;
+                    }
+                }
+
+                // Mark the room as needing cleaning
+                room.NeedsCleaning = true;
+
+                // Add task to database
+                _context.CleaningTasks.Add(task);
+                await _context.SaveChangesAsync();
+
+                return await GetTaskByIdAsync(task.Id);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating cleaning task for room {RoomId}", taskDto.RoomId);
+                throw;
+            }
+        }
 
-            public async Task<CleaningTaskDto> UpdateTaskAsync(int id, UpdateCleaningTaskDto taskDto)
+        private async Task<int> AssignRandomHousekeeperAsync()
+        {
+            try
+            {
+                // Get all users in the Housekeeper role
+                var housekeepers = await _context.UserRoles
+                    .Join(
+                        _context.Roles,
+                        userRole => userRole.RoleId,
+                        role => role.Id,
+                        (userRole, role) => new { userRole.UserId, role.Name }
+                    )
+                    .Where(ur => ur.Name == "Housekeeper")
+                    .Join(
+                        _context.Users.Where(u => u.IsActive),
+                        ur => ur.UserId,
+                        user => user.Id,
+                        (ur, user) => user.Id
+                    )
+                    .ToListAsync();
+
+                if (!housekeepers.Any())
+                {
+                    _logger.LogWarning("No active housekeepers found to assign task");
+                    return 0;
+                }
+
+                // Select a random housekeeper
+                var random = new Random();
+                var selectedHousekeeperId = housekeepers[random.Next(housekeepers.Count)];
+
+                _logger.LogInformation("Randomly assigned task to housekeeper with ID {HousekeeperId}", selectedHousekeeperId);
+                return selectedHousekeeperId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error assigning random housekeeper");
+                return 0; // Return 0 if there was an error so the task remains unassigned
+            }
+        }
+
+
+        public async Task<CleaningTaskDto> UpdateTaskAsync(int id, UpdateCleaningTaskDto taskDto)
             {
                 try
                 {
@@ -185,8 +237,8 @@
 
                     if (!string.IsNullOrEmpty(taskDto.Notes))
                     {
-                        // Implement if you add Notes property to model
-                    }
+                        task.Notes = taskDto.Notes;
+                }
 
                     if (taskDto.CompletedAt.HasValue)
                     {
@@ -680,7 +732,7 @@
             {
                 // Format: CLN-ROOMID-YYYYMMDD-COUNT
                 var today = DateTime.UtcNow.ToString("yyyyMMdd");
-
+               //Rast perfekt per lock duhet implementuar lock ketu
                 // Count how many cleaning tasks were created for this room today
                 int tasksCount = _context.CleaningTasks
                     .Count(t => t.RoomId == roomId &&

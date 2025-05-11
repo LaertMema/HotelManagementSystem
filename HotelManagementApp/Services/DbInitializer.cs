@@ -821,7 +821,7 @@ namespace HotelManagementApp.Services
                 {
                     // Create invoice for each reservation
                     var creationDate = reservation.ReservationDate.AddDays(1);
-                    var isPaid = reservation.Status == ReservationStatus.CheckedOut || reservation.Status == ReservationStatus.CheckedIn;
+                    var IsPaid = reservation.Status == ReservationStatus.CheckedOut || reservation.Status == ReservationStatus.CheckedIn;
 
                     var invoice = new Invoice
                     {
@@ -832,8 +832,8 @@ namespace HotelManagementApp.Services
                         Total = reservation.TotalPrice * 1.12m,
                         CreatedAt = creationDate,
                         //Notes = "Standard invoice for hotel stay",
-                        isPaid = isPaid,
-                        PaidAt = isPaid ? DateTime.UtcNow : null
+                        IsPaid = IsPaid,
+                        PaidAt = IsPaid ? DateTime.UtcNow : null
                     };
 
                     invoices.Add(invoice);
@@ -844,7 +844,7 @@ namespace HotelManagementApp.Services
                 logger.LogInformation("Added {Count} invoices", invoices.Count);
 
                 // Now add payments for paid invoices
-                foreach (var invoice in invoices.Where(i => i.isPaid))
+                foreach (var invoice in invoices.Where(i => i.IsPaid))
                 {
                     var reservation = reservations.FirstOrDefault(r => r.Id == invoice.ReservationId);
                     if (reservation == null) continue;

@@ -73,9 +73,11 @@
             public string InvoiceNumber { get; set; }
             public int ReservationId { get; set; }
             public string ReservationNumber { get; set; }
+             public bool IsPaid { get; set; }
 
-            // Guest information
-            public int GuestId { get; set; }
+
+        // Guest information
+        public int GuestId { get; set; }
             public string GuestName { get; set; }
             public string GuestEmail { get; set; }
 

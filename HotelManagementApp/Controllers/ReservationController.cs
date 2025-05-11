@@ -187,13 +187,30 @@ namespace HotelManagementApp.Controllers
         {
             try
             {
+                // Validate dates
+                if (createReservationDto.CheckInDate.Date < DateTime.Today)
+                {
+                    return BadRequest("Check-in date cannot be in the past");
+                }
+                if (createReservationDto.CheckOutDate <= createReservationDto.CheckInDate)
+                {
+                    return BadRequest("Check-out date must be after check-in date");
+                }
+
                 var userId = int.Parse(User.FindFirst("sub")?.Value ?? "0");
 
-                // Generate reservation number
-                var reservationNumber = $"RES-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}";
-
-                // Calculate total price (simplified, should be more complex in real implementation)
-                var reservation = createReservationDto.ToReservationModel(userId, reservationNumber, 0); // Price will be calculated in service
+                // Let the service generate the reservation number
+                var reservation = new Reservation
+                {
+                    UserId = userId,
+                    RoomTypeId = createReservationDto.RoomTypeId,
+                    CheckInDate = createReservationDto.CheckInDate,
+                    CheckOutDate = createReservationDto.CheckOutDate,
+                    NumberOfGuests = createReservationDto.NumberOfGuests,
+                    SpecialRequests = createReservationDto.SpecialRequests,
+                    PaymentMethod = createReservationDto.PaymentMethod,
+                    // Don't set ReservationNumber or Status - let the service handle it
+                };
 
                 var createdReservation = await _reservationService.CreateReservationAsync(reservation);
                 return CreatedAtAction(nameof(GetReservationById), new { id = createdReservation.Id }, createdReservation.ToReservationDto());
@@ -209,6 +226,7 @@ namespace HotelManagementApp.Controllers
                 return StatusCode(500, "An error occurred while creating the reservation");
             }
         }
+
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin,Manager,Receptionist")]

@@ -14,9 +14,9 @@
         public string Comments { get; set; }
         public string Category { get; set; } // Room, Service, Cleanliness, Food, etc.
         public bool IsResolved { get; set; }
-        public string ResolutionNotes { get; set; }
+        public string? ResolutionNotes { get; set; }
         public int? ResolvedById { get; set; }
-        public ApplicationUser ResolvedBy { get; set; }
+        public ApplicationUser ? ResolvedBy { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? ResolvedAt { get; set; }
     }

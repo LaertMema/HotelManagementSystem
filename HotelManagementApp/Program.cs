@@ -23,52 +23,89 @@ namespace HotelManagementApp
 {
     public class Program
     {
-        public static async Task Main(string[] args)
+        public static void Main(string[] args)
         {
+            // Create the WebApplicationBuilder
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
-            builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(
-             builder.Configuration.GetConnectionString("DefaultConnection")));
+            // Configure logging
+            builder.Logging.ClearProviders();
+            builder.Logging.AddConsole();
+            builder.Logging.AddDebug();
+            builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
-            //builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            //    .AddJwtBearer(options =>
-            //    {
-            //        options.TokenValidationParameters = new TokenValidationParameters
-            //        {
-            //            ValidateIssuer = true,
-            //            ValidateAudience = true,
-            //            ValidateLifetime = true,
-            //            ValidateIssuerSigningKey = true,
-            //            ValidIssuer = Configuration["Jwt:Issuer"],
-            //            ValidAudience = Configuration["Jwt:Audience"],
-            //            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["Jwt:Key"]))
-            //        };
-            //    });
+            Console.WriteLine("Starting application initialization...");
+
+            // Add DbContext with improved error handling
+            builder.Services.AddDbContext<AppDbContext>(options =>
+                options.UseSqlServer(
+                    builder.Configuration.GetConnectionString("DefaultConnection"),
+                    sqlServerOptionsAction: sqlOptions => {
+                        sqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorNumbersToAdd: null);
+                    }
+                ));
+
+            Console.WriteLine($"Connection string: {builder.Configuration.GetConnectionString("DefaultConnection")}");
+
+            // Add Identity
             builder.Services.AddIdentity<ApplicationUser, ApplicationRole>()
                 .AddEntityFrameworkStores<AppDbContext>()
                 .AddDefaultTokenProviders();
 
-            var key = Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"]);
-            builder.Services.AddAuthentication(options =>
+            // Add JWT authentication with fallback for development
+            try
             {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
-            {
-                options.TokenValidationParameters = new TokenValidationParameters
+                if (string.IsNullOrEmpty(builder.Configuration["Jwt:Key"]) ||
+                    string.IsNullOrEmpty(builder.Configuration["Jwt:Issuer"]) ||
+                    string.IsNullOrEmpty(builder.Configuration["Jwt:Audience"]))
                 {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                    ValidAudience = builder.Configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(key)
-                };
-            });
-            // Register HTTP context accessor for authentication service
+                    Console.WriteLine("WARNING: JWT configuration is missing or incomplete in appsettings.json");
+
+                    // Use fallback values for development
+                    if (builder.Environment.IsDevelopment())
+                    {
+                        Console.WriteLine("Using fallback JWT configuration for development environment");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            "JWT configuration is missing in appsettings.json. Please check Jwt:Key, Jwt:Issuer, and Jwt:Audience.");
+                    }
+                }
+
+                var key = Encoding.ASCII.GetBytes(
+                    builder.Configuration["Jwt:Key"] ??
+                    "DefaultKeyForDevelopmentThatIsAtLeast32CharsLong");
+
+                builder.Services.AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                })
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "http://localhost:7138",
+                        ValidAudience = builder.Configuration["Jwt:Audience"] ?? "http://localhost:5500",
+                        IssuerSigningKey = new SymmetricSecurityKey(key)
+                    };
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error configuring JWT authentication: {ex.Message}");
+                throw;
+            }
+
+            // Register services
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<IUserService, UserService>();
@@ -82,47 +119,141 @@ namespace HotelManagementApp
             builder.Services.AddScoped<IServiceService, ServiceService>();
             builder.Services.AddScoped<IServiceOrderService, ServiceOrderService>();
             builder.Services.AddScoped<IStatisticsService, StatisticsService>();
-           
+
+            // Add API controllers
             builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+            // Add Swagger
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            var app = builder.Build();
+            // Build the application
+            WebApplication app;
+            try
+            {
+                app = builder.Build();
+                Console.WriteLine("Application built successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error building application: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+                return;
+            }
 
-            // Configure the HTTP request pipeline.
+            // Configure the HTTP request pipeline (middleware)
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
+                Console.WriteLine("Configured Swagger for development environment");
             }
 
             app.UseHttpsRedirection();
             app.UseAuthentication();
             app.UseAuthorization();
-
-
             app.MapControllers();
-            using (var scope = app.Services.CreateScope())
-            {
-                var services = scope.ServiceProvider;
-                try
-                {
-                    // Initialize database with test data if in development
-                    await DbInitializer.Initialize(services, app.Environment.IsDevelopment());
 
-                    var logger = services.GetRequiredService<ILogger<Program>>();
-                    logger.LogInformation("Database initialized successfully.");
-                }
-                catch (Exception ex)
+            // Initialize the database
+            try
+            {
+                using (var scope = app.Services.CreateScope())
                 {
-                    var logger = services.GetRequiredService<ILogger<Program>>();
-                    logger.LogError(ex, "An error occurred while seeding the database.");
+                    var services = scope.ServiceProvider;
+
+                    try
+                    {
+                        // Test database connection first
+                        var dbContext = services.GetRequiredService<AppDbContext>();
+                        Console.WriteLine("Testing database connection...");
+
+                        // Try simple database operations to verify connection
+                        var canConnect = dbContext.Database.CanConnectAsync().GetAwaiter().GetResult();
+                        Console.WriteLine($"Database connection test result: {canConnect}");
+
+                        if (!canConnect)
+                        {
+                            Console.WriteLine("WARNING: Cannot connect to database. Check your connection string.");
+
+                            // For development, we can create the database if it doesn't exist
+                            if (app.Environment.IsDevelopment())
+                            {
+                                Console.WriteLine("Attempting to create database...");
+                                dbContext.Database.EnsureCreated();
+                                Console.WriteLine("Database creation attempted");
+                            }
+                        }
+
+                        // Initialize database with test data if in development
+                        Console.WriteLine("Initializing database...");
+                        // DbInitializer.Initialize(services, app.Environment.IsDevelopment()).GetAwaiter().GetResult();
+                        RunTestDataSeeder(app);
+                        Console.WriteLine("Database initialized successfully");
+
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Database initialization error: {ex.Message}");
+                        Console.WriteLine(ex.StackTrace);
+
+                        // Log the error but don't crash in development
+                        if (app.Environment.IsDevelopment())
+                        {
+                            var logger = services.GetService<ILogger<Program>>();
+                            if (logger != null)
+                            {
+                                logger.LogError(ex, "An error occurred while initializing the database");
+                            }
+                        }
+                        else
+                        {
+                            // Rethrow in production to prevent starting with invalid database
+                            throw;
+                        }
+                    }
+                }
+
+                Console.WriteLine("Application initialization completed, starting web server...");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Startup error: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+
+                // Only crash in production, let development continue with issues
+                if (!app.Environment.IsDevelopment())
+                {
+                    return;
                 }
             }
+            // Run database seeder
+            
+            // Run the application with synchronous Run rather than async RunAsync
+            app.Run();
+        }
+        private static void RunTestDataSeeder(WebApplication app)
+        {
+            using var scope = app.Services.CreateScope();
+            var services = scope.ServiceProvider;
 
-            await app.RunAsync();
-            //app.Run();
+            try
+            {
+                var context = services.GetRequiredService<AppDbContext>();
+                var logger = services.GetRequiredService<ILogger<Program>>();
+
+                // Ensure database is created
+                context.Database.EnsureCreated();
+
+                // Run the TestDataSeeder
+                TestDataSeeder.SeedTestData(services, logger).GetAwaiter().GetResult();
+
+                logger.LogInformation("Test data seeding completed successfully.");
+            }
+            catch (Exception ex)
+            {
+                var logger = services.GetRequiredService<ILogger<Program>>();
+                logger.LogError(ex, "An error occurred while seeding the test data.");
+            }
         }
     }
 }

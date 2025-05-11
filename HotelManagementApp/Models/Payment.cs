@@ -13,7 +13,7 @@ namespace HotelManagementApp.Models
         public bool IsRefunded { get; set; } = false;
         public string? RefundReason { get; set; } // Nullable for non-refunded payments
         public int? ProcessedBy { get; set; } // Nullable for automatic transactions
-        public ApplicationUser ProcessedByUser { get; set; }
+        public ApplicationUser ? ProcessedByUser { get; set; }
 
         public string? TransactionId { get; set; } // Optional for tracking payment transactions
         public string? Notes { get; set; } // Optional notes for the payment

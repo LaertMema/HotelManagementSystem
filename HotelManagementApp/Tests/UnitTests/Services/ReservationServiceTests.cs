@@ -46,7 +46,8 @@ namespace HotelManagementApp.Tests.UnitTests.Services
             using var context = new AppDbContext(_options);
 
             // Create room types
-            var roomTypes = new List<RoomType>{
+            var roomTypes = new List<RoomType>
+    {
         new RoomType
         {
             Id = 1,
@@ -72,11 +73,35 @@ namespace HotelManagementApp.Tests.UnitTests.Services
 
             // Create rooms
             var rooms = new List<Room>
-            {
-              new Room { Id = 1, RoomNumber = "101", Floor = 1, RoomTypeId = 1, Status = RoomStatus.Available, BasePrice = 100m, Notes = "Standard room on the first floor" },
-              new Room { Id = 2, RoomNumber = "102", Floor = 1, RoomTypeId = 2, Status = RoomStatus.Available, BasePrice = 150m, Notes = "Deluxe room on the first floor" },
-              new Room { Id = 3, RoomNumber = "201", Floor = 2, RoomTypeId = 1, Status = RoomStatus.Maintenance, BasePrice = 100m, Notes = "Standard room under maintenance" }
-            };
+    {
+        new Room {
+            Id = 1,
+            RoomNumber = "101",
+            Floor = 1,
+            RoomTypeId = 1,
+            Status = RoomStatus.Available,
+            BasePrice = 100m,
+            Notes = "Standard room on the first floor"
+        },
+        new Room {
+            Id = 2,
+            RoomNumber = "102",
+            Floor = 1,
+            RoomTypeId = 2,
+            Status = RoomStatus.Available,
+            BasePrice = 150m,
+            Notes = "Deluxe room on the first floor"
+        },
+        new Room {
+            Id = 3,
+            RoomNumber = "201",
+            Floor = 2,
+            RoomTypeId = 1,
+            Status = RoomStatus.Maintenance,
+            BasePrice = 100m,
+            Notes = "Standard room under maintenance"
+        }
+    };
             context.Rooms.AddRange(rooms);
 
             // Create users
@@ -121,101 +146,135 @@ namespace HotelManagementApp.Tests.UnitTests.Services
     };
             context.Users.AddRange(users);
 
-            //Create reservations
-            //Formatimi skandal po pertoj ta ndreq :/
-           
+            // Create reservations
             var reservations = new List<Reservation>
-{
-    new Reservation
     {
-        Id = 1,
-        ReservationNumber = "RES-20250501-1234",
-        UserId = 1,
-        RoomId = 1,
-        RoomTypeId = 1,
-        CheckInDate = DateTime.Today.AddDays(-2),
-        CheckOutDate = DateTime.Today.AddDays(3),
-        Status = ReservationStatus.CheckedIn,
-        ReservationDate = DateTime.Today.AddDays(-5),
-        NumberOfGuests = 2,
-        TotalPrice = 500m
-    },
-    new Reservation
-    {
-        Id = 2,
-        ReservationNumber = "RES-20250502-5678",
-        UserId = 2,
-        RoomId = null,
-        RoomTypeId = 2,
-        CheckInDate = DateTime.Today.AddDays(5),
-        CheckOutDate = DateTime.Today.AddDays(10),
-        Status = ReservationStatus.Confirmed,
-        ReservationDate = DateTime.Today.AddDays(-1),
-        NumberOfGuests = 2,
-        TotalPrice = 750m
-    },
-    new Reservation
-    {
-        Id = 3,
-        ReservationNumber = "RES-20250503-9012",
-        UserId = 1,
-        RoomId = 2,
-        RoomTypeId = 2,
-        CheckInDate = DateTime.Today,
-        CheckOutDate = DateTime.Today.AddDays(3),
-        Status = ReservationStatus.Reserved, // Keep status as Reserved
-        ReservationDate = DateTime.Today.AddDays(-3),
-        NumberOfGuests = 1,
-        TotalPrice = 450m
-    },
-    new Reservation
-    {
-        Id = 4,
-        ReservationNumber = "RES-20250504-3456",
-        UserId = 2,
-        RoomId = null,
-        RoomTypeId = 1,
-        CheckInDate = DateTime.Today.AddDays(10),
-        CheckOutDate = DateTime.Today.AddDays(15),
-        Status = ReservationStatus.Confirmed, // Add a new Confirmed reservation
-        ReservationDate = DateTime.Today.AddDays(-2),
-        NumberOfGuests = 3,
-        TotalPrice = 600m
-    }
-};
+        new Reservation
+        {
+            Id = 1,
+            ReservationNumber = "RES-20250501-1234",
+            UserId = 1,
+            RoomId = 1,
+            RoomTypeId = 1,
+            CheckInDate = DateTime.Today.AddDays(-2),
+            CheckOutDate = DateTime.Today.AddDays(3),
+            Status = ReservationStatus.CheckedIn,
+            ReservationDate = DateTime.Today.AddDays(-5),
+            NumberOfGuests = 2,
+            TotalPrice = 500m,
+            PaymentMethod = PaymentMethod.CreditCard,
+            PaymentStatus = PaymentStatus.Paid,
+            SpecialRequests = "Early check-in requested",
+            CheckedInTime = DateTime.Today.AddDays(-2).AddHours(14),
+            CheckedInBy = 3,
+            CreatedBy = 2,
+            ServiceOrders = new List<ServiceOrder>(),
+            Payments = new List<Payment>(),
+            Invoices = new List<Invoice>()
+        },
+        new Reservation
+        {
+            Id = 2,
+            ReservationNumber = "RES-20250502-5678",
+            UserId = 2,
+            RoomId = null,
+            RoomTypeId = 2,
+            CheckInDate = DateTime.Today.AddDays(5),
+            CheckOutDate = DateTime.Today.AddDays(10),
+            Status = ReservationStatus.Confirmed,
+            ReservationDate = DateTime.Today.AddDays(-1),
+            NumberOfGuests = 2,
+            TotalPrice = 750m,
+            PaymentMethod = PaymentMethod.DebitCard,
+            PaymentStatus = PaymentStatus.Pending,
+            SpecialRequests = null,
+            CreatedBy = 2,
+            ServiceOrders = new List<ServiceOrder>(),
+            Payments = new List<Payment>(),
+            Invoices = new List<Invoice>()
+        },
+        new Reservation
+        {
+            Id = 3,
+            ReservationNumber = "RES-20250503-9012",
+            UserId = 1,
+            RoomId = 2,
+            RoomTypeId = 2,
+            CheckInDate = DateTime.Today,
+            CheckOutDate = DateTime.Today.AddDays(3),
+            Status = ReservationStatus.Confirmed,
+            ReservationDate = DateTime.Today.AddDays(-3),
+            NumberOfGuests = 1,
+            TotalPrice = 450m,
+            PaymentMethod = PaymentMethod.Cash,
+            PaymentStatus = PaymentStatus.Pending,
+            SpecialRequests = "Late check-out if possible",
+            CreatedBy = 3,
+            ServiceOrders = new List<ServiceOrder>(),
+            Payments = new List<Payment>(),
+            Invoices = new List<Invoice>()
+        },
+        new Reservation
+        {
+            Id = 4,
+            ReservationNumber = "RES-20250504-3456",
+            UserId = 2,
+            RoomId = null,
+            RoomTypeId = 1,
+            CheckInDate = DateTime.Today.AddDays(10),
+            CheckOutDate = DateTime.Today.AddDays(15),
+            Status = ReservationStatus.Confirmed,
+            ReservationDate = DateTime.Today.AddDays(-2),
+            NumberOfGuests = 3,
+            TotalPrice = 600m,
+            PaymentMethod = PaymentMethod.BankTransfer,
+            PaymentStatus = PaymentStatus.Pending,
+            SpecialRequests = "Additional bed needed",
+            CreatedBy = 3,
+            ServiceOrders = new List<ServiceOrder>(),
+            Payments = new List<Payment>(),
+            Invoices = new List<Invoice>()
+        }
+    };
             context.Reservations.AddRange(reservations);
-
-
 
             // Create invoices
             var invoices = new List<Invoice>
-            {
-            new Invoice
-    { //Pertoj ta formatoj :/
-        Id = 1,
-        InvoiceNumber = "INV-20250501-1",  
-        ReservationId = 1,
-        Amount = 500m,
-        Tax = 50m,
-        Total = 550m,
-        CreatedAt = DateTime.Today.AddDays(-5)
-    },
-    new Invoice
     {
-        Id = 2,
-        InvoiceNumber = "INV-20250502-2",  // Mos e harro
-        ReservationId = 2,
-        Amount = 750m,
-        Tax = 75m,
-        Total = 825m,
-        CreatedAt = DateTime.Today.AddDays(-1)
-    }
-};
-
+        new Invoice
+        {
+            Id = 1,
+            InvoiceNumber = "INV-20250501-1",
+            ReservationId = 1,
+            Amount = 500m,
+            Tax = 50m,
+            Total = 550m,
+            CreatedAt = DateTime.Today.AddDays(-5),
+            DueDate = DateTime.Today.AddDays(3),
+            Notes = "Standard room invoice"
+        },
+        new Invoice
+        {
+            Id = 2,
+            InvoiceNumber = "INV-20250502-2",
+            ReservationId = 2,
+            Amount = 750m,
+            Tax = 75m,
+            Total = 825m,
+            CreatedAt = DateTime.Today.AddDays(-1),
+            DueDate = DateTime.Today.AddDays(10),
+            Notes = "Deluxe room invoice"
+        }
+    };
             context.Invoices.AddRange(invoices);
+
+            // Associate invoices with reservations
+            reservations[0].Invoices = new List<Invoice> { invoices[0] };
+            reservations[1].Invoices = new List<Invoice> { invoices[1] };
 
             context.SaveChanges();
         }
+
 
         [Fact]
         public async Task GetAllReservationsAsync_ReturnsAllReservations()
@@ -428,7 +487,7 @@ namespace HotelManagementApp.Tests.UnitTests.Services
 
             // Assert
             var reservations = result.ToList();
-            Assert.Equal(2, reservations.Count);
+            Assert.Equal(3, reservations.Count);
             Assert.All(reservations, r => Assert.Equal(ReservationStatus.Confirmed, r.Status));
         }
 
@@ -544,7 +603,7 @@ namespace HotelManagementApp.Tests.UnitTests.Services
             Assert.NotNull(result);
             Assert.Equal(4, result["Total"]); // 3 total reservations
             Assert.Equal(1, result["CheckedIn"]); // 1 checked in
-            Assert.Equal(2, result["Reserved"]); // 2 confirmed/reserved
+            Assert.Equal(3, result["Confirmed"]); // 2 confirmed/reserved
         }
     }
 }

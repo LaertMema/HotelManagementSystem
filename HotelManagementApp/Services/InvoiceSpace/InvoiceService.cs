@@ -103,7 +103,7 @@
                     Total = totalAmount,
                     CreatedAt = DateTime.UtcNow,
                     PaidAt = null,
-                    isPaid = false, // Initialize as unpaid
+                    IsPaid = false, // Initialize as unpaid
                     //Notes = createInvoiceDto.Notes,
                     //DueDate = createInvoiceDto.DueDate, // Keep DueDate for reference
                     Payments = new List<Payment>()
@@ -135,7 +135,7 @@
                 }
 
                 // Check if invoice is already paid
-                if (invoice.isPaid)
+                if (invoice.IsPaid)
                 {
                     throw new InvalidOperationException("Cannot update a paid invoice");
                 }
@@ -176,7 +176,7 @@
                 if (updateInvoiceDto.PaidAt.HasValue)
                 {
                     invoice.PaidAt = updateInvoiceDto.PaidAt;
-                    invoice.isPaid = true; // Set isPaid to true if PaidAt is provided
+                    invoice.IsPaid = true; // Set IsPaid to true if PaidAt is provided
                 }
 
                 await _context.SaveChangesAsync();
@@ -395,7 +395,7 @@
                     .Include(i => i.Reservation.RoomType)
                     .Include(i => i.Reservation.Room)
                     .Include(i => i.Payments)
-                    .Where(i => !i.isPaid) // Use isPaid instead of checking PaidAt
+                    .Where(i => !i.IsPaid) // Use IsPaid instead of checking PaidAt
                     .OrderByDescending(i => i.CreatedAt)
                     .ToListAsync();
 
@@ -420,8 +420,8 @@
                     .Include(i => i.Reservation.RoomType)
                     .Include(i => i.Reservation.Room)
                     .Include(i => i.Payments)
-                    //.Where(i => i.DueDate.HasValue && i.DueDate.Value < today && !i.isPaid) // Use isPaid instead of checking PaidAt
-                    //.OrderBy(i => i.DueDate)
+                    .Where(i => i.DueDate.HasValue && i.DueDate.Value < today && !i.IsPaid) // Use IsPaid instead of checking PaidAt
+                    .OrderBy(i => i.DueDate)
                     .ToListAsync();
 
                 return invoices.Select(i => MapToInvoiceDto(i));
@@ -507,7 +507,7 @@
                 decimal totalPaid = payments.Sum(p => p.AmountPaid);
                 if (totalPaid >= invoice.Total)
                 {
-                    invoice.isPaid = true;
+                    invoice.IsPaid = true;
                     invoice.PaidAt = DateTime.UtcNow;
                 }
 
@@ -561,12 +561,12 @@
                     .ToListAsync();
 
                 var totalInvoiceCount = allInvoices.Count;
-                var paidInvoiceCount = allInvoices.Count(i => i.isPaid);
-                var pendingInvoiceCount = allInvoices.Count(i => !i.isPaid && i.Status == PaymentStatus.Pending);
-                var partiallyPaidInvoiceCount = allInvoices.Count(i => !i.isPaid && i.Status == PaymentStatus.PartiallyPaid);
+                var paidInvoiceCount = allInvoices.Count(i => i.IsPaid);
+                var pendingInvoiceCount = allInvoices.Count(i => !i.IsPaid && i.Status == PaymentStatus.Pending);
+                var partiallyPaidInvoiceCount = allInvoices.Count(i => !i.IsPaid && i.Status == PaymentStatus.PartiallyPaid);
 
                 var totalAmount = allInvoices.Sum(i => i.Total);
-                var paidAmount = allInvoices.Where(i => i.isPaid).Sum(i => i.Total);
+                var paidAmount = allInvoices.Where(i => i.IsPaid).Sum(i => i.Total);
                 var pendingAmount = totalAmount - allInvoices.SelectMany(i => i.Payments)
                     .Where(p => !p.IsRefunded)
                     .Sum(p => p.AmountPaid);
@@ -574,7 +574,7 @@
                 // Calculate overdue invoices
                 var today = DateTime.UtcNow.Date;
                 var overdueInvoices = allInvoices.Where(i =>
-                    !i.isPaid).ToList();
+                    !i.IsPaid).ToList();
 
                 var overdueInvoiceCount = overdueInvoices.Count;
                 var overdueAmount = overdueInvoices.Sum(i =>
@@ -670,7 +670,7 @@
 
                 // Status
                 Status = invoice.Status.ToString(),
-                IsPaid = invoice.isPaid, // Add IsPaid property to DTO
+                IsPaid = invoice.IsPaid, // Add IsPaid property to DTO
 
                 //// Notes
                 //Notes = invoice.Notes,
@@ -802,7 +802,7 @@
         // Status
         public string Status { get; set; }
         public bool IsOverdue => DueDate.HasValue && DueDate.Value < DateTime.Today && Balance > 0;
-        public bool IsPaid { get; set; } // Added for isPaid property in Invoice model
+        public bool IsPaid { get; set; } // Added for IsPaid property in Invoice model
 
         // Notes
         public string Notes { get; set; }

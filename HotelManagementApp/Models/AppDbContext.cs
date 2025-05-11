@@ -175,11 +175,12 @@ namespace HotelManagementApp.Models
                 .HasForeignKey(p => p.InvoiceId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            //builder.Entity<Payment>()
-            //    .HasOne(p => p.ProcessedByUser)
-            //    .WithMany(/*u => u.Payments*/)
-            //    .HasForeignKey(p => p.ProcessedBy)
-            //    .IsRequired(false);
+            builder.Entity<Payment>()
+                .HasOne(p => p.ProcessedByUser)
+                .WithMany(/*u => u.Payments*/)
+                .HasForeignKey(p => p.ProcessedBy)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // MaintenanceRequest Relationships
             builder.Entity<MaintenanceRequest>()

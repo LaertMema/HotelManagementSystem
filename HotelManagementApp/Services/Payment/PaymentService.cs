@@ -547,15 +547,15 @@
                 .Where(p => !p.IsRefunded)
                 .Sum(p => p.AmountPaid);
 
-            // Update payment status using isPaid property
+            // Update payment status using IsPaid property
             if (totalPaid >= invoice.Total)
             {
-                invoice.isPaid = true;
+                invoice.IsPaid = true;
                 invoice.PaidAt = DateTime.UtcNow;
             }
             else
             {
-                invoice.isPaid = false;
+                invoice.IsPaid = false;
                 invoice.PaidAt = null;
             }
         }

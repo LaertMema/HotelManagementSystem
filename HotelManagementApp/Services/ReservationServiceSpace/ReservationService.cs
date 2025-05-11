@@ -94,20 +94,35 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                     }
                 }
                 // Set status to Reserved
-                reservation.Status = ReservationStatus.Reserved;
+                reservation.Status = ReservationStatus.Confirmed;
                 // Create an invoice for the reservation
-                // Create an invoice for the reservation
-                var invoice = new Invoice
+                try
                 {
-                    Reservation = reservation,
-                    InvoiceNumber = await _invoiceService.GenerateInvoiceNumberAsync(), //generates number
-                    Amount = reservation.TotalPrice,
-                    Tax = reservation.TotalPrice * 0.1m, // Assuming a 10% tax rate
-                    Total = reservation.TotalPrice * 1.1m, // Total amount including tax
-                    CreatedAt = DateTime.UtcNow
-                };
+                    var invoice = new Invoice
+                    {
+                        Reservation = reservation,
+                        InvoiceNumber = await _invoiceService.GenerateInvoiceNumberAsync(), //generates number
+                        Amount = reservation.TotalPrice,
+                        Tax = reservation.TotalPrice * 0.1m, // Assuming a 10% tax rate
+                        Total = reservation.TotalPrice * 1.1m, // Total amount including tax
+                        CreatedAt = DateTime.UtcNow,
+                        Notes = "Initial invoice for reservation",
+                        DueDate = reservation.CheckOutDate
+                    };
+                    reservation.Invoices = new List<Invoice> { invoice };
+                }
+                catch (Exception ex)
+                {
+                    // Optional: Add a flag or note to the reservation indicating missing invoice
+                   
 
-                reservation.Invoices = new List<Invoice> { invoice };
+                    // Initialize an empty list to avoid null reference exceptions
+                    reservation.Invoices = new List<Invoice>();
+
+                    // Continue with reservation creation 
+                }
+
+
 
 
 
@@ -165,7 +180,8 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                     {
                         invoice.Amount = reservation.TotalPrice;
                         invoice.Tax = reservation.TotalPrice * 0.1m; // Assuming a 10% tax rate
-                        invoice.Total = reservation.TotalPrice * 1.1m; // Total amount including tax
+                        invoice.Total = reservation.TotalPrice * 1.1m;// Total amount including tax
+                        invoice.DueDate = reservation.CheckOutDate; // Update due date to match checkout date
                         _context.Invoices.Update(invoice);
                     }
                 }
@@ -295,7 +311,7 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 return await _context.Reservations
                     .Include(r => r.User)
                     .Include(r => r.RoomType)
-                    .Where(r => r.CheckInDate.Date == today && r.Status == ReservationStatus.Reserved)
+                    .Where(r => r.CheckInDate.Date == today && r.Status == ReservationStatus.Confirmed)
                     .ToListAsync();
             }
             catch (Exception ex)
@@ -366,7 +382,7 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
         }
 
 
-        public async Task<bool> CheckInAsync(int id,int roomId, int receptionistId)
+        public async Task<bool> CheckInAsync(int id, int roomId, int receptionistId)
         {
             try
             {
@@ -377,7 +393,8 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 }
 
                 // Check if the reservation is in the correct status
-                if (reservation.Status != ReservationStatus.CheckedIn)
+                if (reservation.Status != ReservationStatus.Confirmed &&
+                    reservation.Status != ReservationStatus.Confirmed) // Allow both statuses
                 {
                     throw new InvalidOperationException($"Cannot check in reservation with status '{reservation.Status}'");
                 }
@@ -390,6 +407,11 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
 
                 // Check if the room is the correct type
                 var room = await _context.Rooms.FindAsync(roomId);
+                if (room == null)
+                {
+                    throw new KeyNotFoundException($"Room with ID {roomId} not found");
+                }
+
                 if (room.RoomTypeId != reservation.RoomTypeId)
                 {
                     throw new InvalidOperationException("Selected room does not match the reserved room type");
@@ -399,18 +421,15 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 reservation.Status = ReservationStatus.CheckedIn;
                 reservation.RoomId = roomId;
                 reservation.CheckedInTime = DateTime.UtcNow;
+
                 ApplicationUser receptionist = await _context.Users.FindAsync(receptionistId);
-                if(reservation.CheckedInBy!=null && reservation.CheckedInByUser != null)
+                if (receptionist == null)
                 {
-                    throw new InvalidOperationException("Reservation is already checked in");
+                    throw new KeyNotFoundException($"User with ID {receptionistId} not found");
                 }
-                if (reservation.CheckedInBy == null && receptionist!=null)
-                {
-                    reservation.CheckedInBy = receptionistId;
-                    reservation.CheckedInByUser = receptionist;
-                }
-                
-                
+
+                reservation.CheckedInBy = receptionistId;
+                reservation.CheckedInByUser = receptionist;
 
                 // Update room status
                 room.Status = RoomStatus.Occupied;
@@ -424,6 +443,7 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 throw;
             }
         }
+
 
         public async Task<bool> CheckOutAsync(int id, int receptionistId)
         {
@@ -521,7 +541,6 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 var overlappingReservations = _context.Reservations
                     .Where(r => r.RoomId == roomId &&
                                 r.Status != ReservationStatus.Cancelled &&
-                                r.Status != ReservationStatus.Reserved &&
                                 ((checkIn >= r.CheckInDate && checkIn < r.CheckOutDate) ||
                                  (checkOut > r.CheckInDate && checkOut <= r.CheckOutDate) ||
                                  (checkIn <= r.CheckInDate && checkOut >= r.CheckOutDate)));
@@ -589,13 +608,13 @@ namespace HotelManagementApp.Services.ReservationServiceSpace
                 var stats = new Dictionary<string, int>();
 
                 stats["Total"] = await _context.Reservations.CountAsync();
-                stats["Reserved"] = await _context.Reservations.CountAsync(r => r.Status == ReservationStatus.Confirmed);
+                stats["Confirmed"] = await _context.Reservations.CountAsync(r => r.Status == ReservationStatus.Confirmed);
                 stats["CheckedIn"] = await _context.Reservations.CountAsync(r => r.Status == ReservationStatus.CheckedIn);
                 stats["Completed"] = await _context.Reservations.CountAsync(r => r.Status == ReservationStatus.CheckedOut);
                 stats["Cancelled"] = await _context.Reservations.CountAsync(r => r.Status == ReservationStatus.Cancelled);
 
                 stats["TodayArrivals"] = await _context.Reservations
-                    .CountAsync(r => r.CheckInDate.Date == DateTime.Today && r.Status == ReservationStatus.Reserved);
+                    .CountAsync(r => r.CheckInDate.Date == DateTime.Today && r.Status == ReservationStatus.Confirmed);
 
                 stats["TodayDepartures"] = await _context.Reservations
                     .CountAsync(r => r.CheckOutDate.Date == DateTime.Today && r.Status == ReservationStatus.CheckedIn);

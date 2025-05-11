@@ -9,13 +9,16 @@
     // Request DTOs
     public class CreateReservationDto
         {
-            [Required]
-            public DateTime CheckInDate { get; set; }
+        [Required]
+        [FutureDate(ErrorMessage = "Check-in date must be in the future")]
+        public DateTime CheckInDate { get; set; }
 
-            [Required]
-            public DateTime CheckOutDate { get; set; }
+        [Required]
+        [DateGreaterThan("CheckInDate", ErrorMessage = "Check-out date must be after check-in date")]
+        public DateTime CheckOutDate { get; set; }
 
-            [Required]
+
+        [Required]
             public int RoomTypeId { get; set; }
 
             [Required]
@@ -27,7 +30,34 @@
 
             public PaymentMethod PaymentMethod { get; set; }
         }
+    public class FutureDateAttribute : ValidationAttribute
+    {
+        public override bool IsValid(object value)
+        {
+            return value is DateTime date && date.Date >= DateTime.Today;
+        }
+    }
+    public class DateGreaterThanAttribute : ValidationAttribute
+    {
+        private readonly string _comparisonProperty;
 
+        public DateGreaterThanAttribute(string comparisonProperty)
+        {
+            _comparisonProperty = comparisonProperty;
+        }
+
+        protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+        {
+            var compareValue = validationContext.ObjectType.GetProperty(_comparisonProperty)?.GetValue(validationContext.ObjectInstance);
+
+            if (value is DateTime endDate && compareValue is DateTime startDate && endDate <= startDate)
+            {
+                return new ValidationResult(ErrorMessage);
+            }
+
+            return ValidationResult.Success;
+        }
+    }
         public class UpdateReservationDto
         {
             public DateTime? CheckInDate { get; set; }
@@ -53,9 +83,10 @@
 
         public class CheckInDto
         {
-            [StringLength(500)]
-            public string Notes { get; set; }
-            public int RoomId { get; set; }
+        [StringLength(500)]
+        public string Notes { get; set; }
+        [Required]
+         public int RoomId { get; set; }
         }
 
         public class CheckOutDto

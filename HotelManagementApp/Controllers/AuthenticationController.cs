@@ -107,7 +107,9 @@ namespace HotelManagementApp.Controllers
                 UserName = model.Username,
                 Email = model.Email,
                 FirstName = model.FirstName,
-                LastName = model.LastName
+                LastName = model.LastName,
+                IdType = "Passport",  // Add a default value if required
+                IdNumber = "Default"
             };
 
             var result = await _authService.RegisterUserAsync(user, model.Password);

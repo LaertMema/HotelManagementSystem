@@ -16,6 +16,9 @@ namespace HotelManagementApp.Models
         public CleaningRequestStatus Status { get; set; } // Pending, InProgress, Completed
         public DateTime CreatedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
-        public string CompletionNotes { get; set; }
+
+        public string ? CompletionNotes { get; set; }
+        public string Notes { get; set; }
+
     }
 }

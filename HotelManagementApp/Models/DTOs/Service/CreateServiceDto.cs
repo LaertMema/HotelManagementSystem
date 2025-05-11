@@ -49,8 +49,8 @@
 
             public bool? IsActive { get; set; }
 
-            [StringLength(200)]
-            public string ImageUrl { get; set; }
+            //[StringLength(200)]
+            //public string ImageUrl { get; set; }
         }
 
         public class ServiceDto
@@ -60,11 +60,11 @@
             public string Description { get; set; }
             public decimal Price { get; set; }
             public string ServiceType { get; set; }
-            public string Category { get; set; }
+            //public string Category { get; set; }
             public bool IsActive { get; set; }
-            public string ImageUrl { get; set; }
-            public DateTime CreatedAt { get; set; }
-            public DateTime? UpdatedAt { get; set; }
+            //public string ImageUrl { get; set; }
+            //public DateTime CreatedAt { get; set; }
+            //public DateTime? UpdatedAt { get; set; }
 
             // Statistics
             public int TotalOrders { get; set; }

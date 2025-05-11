@@ -22,11 +22,11 @@
 
             public int? AssignedToId { get; set; }
 
-            public DateTime? ScheduledFor { get; set; }
+        //public DateTime? ScheduledFor { get; set; }
 
-            [StringLength(500)]
-            public string Notes { get; set; }
-        }
+        //[StringLength(500)]
+        public string Notes { get; set; }
+    }
 
         public class UpdateCleaningTaskDto
         {
@@ -62,13 +62,13 @@
             public string Status { get; set; }
             public string Priority { get; set; }
             public DateTime CreatedAt { get; set; }
-            public DateTime? ScheduledFor { get; set; }
+            //public DateTime? ScheduledFor { get; set; }
             public DateTime? CompletedAt { get; set; }
 
             // Assignment information
             public int? AssignedToId { get; set; }
             public string AssignedToName { get; set; }
-            public DateTime? AssignedAt { get; set; }
+            //public DateTime? AssignedAt { get; set; }
 
             // Completion information
             public string CompletionNotes { get; set; }

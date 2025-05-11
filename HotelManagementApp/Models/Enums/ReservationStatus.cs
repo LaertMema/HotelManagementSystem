@@ -7,7 +7,6 @@
         CheckedOut,
         Cancelled,
         Pending,
-        Reserved, // ??? Redundant
         Completed
     }
 }

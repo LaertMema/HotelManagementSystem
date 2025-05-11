@@ -58,13 +58,43 @@ namespace HotelManagementApp.Services.Authentication
 
         public async Task<ApplicationUser> GetCurrentUserAsync()
         {
-            var userId = _userManager.GetUserId(_httpContextAccessor.HttpContext.User);
-            if (string.IsNullOrEmpty(userId))
+            try
             {
+                // Make sure HttpContext exists
+                if (_httpContextAccessor.HttpContext == null)
+                {
+                    return null;
+                }
+
+                // Try to get the user directly from the claims
+                var user = _httpContextAccessor.HttpContext.User;
+                if (user == null || !user.Identity.IsAuthenticated)
+                {
+                    return null;
+                }
+
+                // Look for the name identifier claim which contains the user ID
+                var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                                  user.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
+                                  user.FindFirst(JwtRegisteredClaimNames.NameId)?.Value;
+
+                if (string.IsNullOrEmpty(userIdClaim))
+                {
+                    return null;
+                }
+
+                // Use the ID to find the user
+                var appUser = await _userManager.FindByIdAsync(userIdClaim);
+                return appUser;
+            }
+            catch (Exception ex)
+            {
+                // Log the exception - critical for debugging issues like this
+                Console.WriteLine($"Error in GetCurrentUserAsync: {ex.Message}");
                 return null;
             }
-            return await _userManager.FindByIdAsync(userId);
         }
+
 
         public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
         {
@@ -145,12 +175,15 @@ namespace HotelManagementApp.Services.Authentication
             var userRoles = await _userManager.GetRolesAsync(user);
 
             var claims = new List<Claim>
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.NameId, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.UserName)
-            };
+    {
+        // Use the user's ID for Sub and NameId claims
+        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+        new Claim(JwtRegisteredClaimNames.NameId, user.Id.ToString()),
+
+        // Add other claims
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        new Claim(ClaimTypes.Name, user.UserName)
+    };
 
             // Add role claims
             foreach (var role in userRoles)
@@ -173,6 +206,7 @@ namespace HotelManagementApp.Services.Authentication
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
 
         public async Task<bool> ValidateTokenAsync(string token)
         {
