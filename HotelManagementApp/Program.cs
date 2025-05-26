@@ -1,4 +1,3 @@
-
 using HotelManagementApp.Models;
 using HotelManagementApp.Services;
 using HotelManagementApp.Services.Authentication;
@@ -9,6 +8,7 @@ using HotelManagementApp.Services.MaintenanceRequest;
 using HotelManagementApp.Services.Payment;
 using HotelManagementApp.Services.ReservationServiceSpace;
 using HotelManagementApp.Services.RoomServiceSpace;
+using HotelManagementApp.Models.DTOs.RoomType;
 using HotelManagementApp.Services.ServiceOrder;
 using HotelManagementApp.Services.ServiceService;
 using HotelManagementApp.Services.Statistics;
@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace HotelManagementApp
 {
@@ -25,7 +26,6 @@ namespace HotelManagementApp
     {
         public static void Main(string[] args)
         {
-            // Create the WebApplicationBuilder
             var builder = WebApplication.CreateBuilder(args);
 
             // Configure logging
@@ -36,11 +36,12 @@ namespace HotelManagementApp
 
             Console.WriteLine("Starting application initialization...");
 
-            // Add DbContext with improved error handling
+            // Configure DbContext
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(
-                    builder.Configuration.GetConnectionString("DefaultConnection"),
-                    sqlServerOptionsAction: sqlOptions => {
+                    "Server=DESKTOP-VEC9Q0R;Database=HotelManagementDB;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True",
+                    sqlServerOptionsAction: sqlOptions =>
+                    {
                         sqlOptions.EnableRetryOnFailure(
                             maxRetryCount: 5,
                             maxRetryDelay: TimeSpan.FromSeconds(30),
@@ -48,62 +49,52 @@ namespace HotelManagementApp
                     }
                 ));
 
-            Console.WriteLine($"Connection string: {builder.Configuration.GetConnectionString("DefaultConnection")}");
+            Console.WriteLine("Using connection string for server: DESKTOP-VEC9Q0R");
 
-            // Add Identity
+            // Configure CORS
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("CorsPolicy", policy =>
+                {
+                    policy.AllowAnyOrigin()
+                          .AllowAnyHeader()
+                          .AllowAnyMethod();
+                });
+            });
+
+            // Configure Identity
             builder.Services.AddIdentity<ApplicationUser, ApplicationRole>()
                 .AddEntityFrameworkStores<AppDbContext>()
                 .AddDefaultTokenProviders();
 
-            // Add JWT authentication with fallback for development
-            try
+            // Configure JWT Authentication
+            var jwtKey = builder.Configuration["Jwt:Key"] ?? "DefaultKeyForDevelopmentThatIsAtLeast32CharsLong";
+            var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "http://localhost:7138";
+            var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "http://localhost:5500";
+
+            var key = Encoding.ASCII.GetBytes(jwtKey);
+
+            builder.Services.AddAuthentication(options =>
             {
-                if (string.IsNullOrEmpty(builder.Configuration["Jwt:Key"]) ||
-                    string.IsNullOrEmpty(builder.Configuration["Jwt:Issuer"]) ||
-                    string.IsNullOrEmpty(builder.Configuration["Jwt:Audience"]))
-                {
-                    Console.WriteLine("WARNING: JWT configuration is missing or incomplete in appsettings.json");
-
-                    // Use fallback values for development
-                    if (builder.Environment.IsDevelopment())
-                    {
-                        Console.WriteLine("Using fallback JWT configuration for development environment");
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException(
-                            "JWT configuration is missing in appsettings.json. Please check Jwt:Key, Jwt:Issuer, and Jwt:Audience.");
-                    }
-                }
-
-                var key = Encoding.ASCII.GetBytes(
-                    builder.Configuration["Jwt:Key"] ??
-                    "DefaultKeyForDevelopmentThatIsAtLeast32CharsLong");
-
-                builder.Services.AddAuthentication(options =>
-                {
-                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-                })
-                .AddJwtBearer(options =>
-                {
-                    options.TokenValidationParameters = new TokenValidationParameters
-                    {
-                        ValidateIssuer = true,
-                        ValidateAudience = true,
-                        ValidateLifetime = true,
-                        ValidateIssuerSigningKey = true,
-                        ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "http://localhost:7138",
-                        ValidAudience = builder.Configuration["Jwt:Audience"] ?? "http://localhost:5500",
-                        IssuerSigningKey = new SymmetricSecurityKey(key)
-                    };
-                });
-            }
-            catch (Exception ex)
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
             {
-                Console.WriteLine($"Error configuring JWT authentication: {ex.Message}");
-                throw;
-            }
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtIssuer,
+                    ValidAudience = jwtAudience,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    // This line ensures ASP.NET Core recognizes your role claim!
+                    RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+                    NameClaimType = JwtRegisteredClaimNames.Sub
+                };
+            });
 
             // Register services
             builder.Services.AddHttpContextAccessor();
@@ -119,29 +110,19 @@ namespace HotelManagementApp
             builder.Services.AddScoped<IServiceService, ServiceService>();
             builder.Services.AddScoped<IServiceOrderService, ServiceOrderService>();
             builder.Services.AddScoped<IStatisticsService, StatisticsService>();
+         
+  
 
-            // Add API controllers
+            // Add controllers
             builder.Services.AddControllers();
 
             // Add Swagger
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            // Build the application
-            WebApplication app;
-            try
-            {
-                app = builder.Build();
-                Console.WriteLine("Application built successfully");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error building application: {ex.Message}");
-                Console.WriteLine(ex.StackTrace);
-                return;
-            }
+            var app = builder.Build();
 
-            // Configure the HTTP request pipeline (middleware)
+            // Configure middleware
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -150,8 +131,12 @@ namespace HotelManagementApp
             }
 
             app.UseHttpsRedirection();
+
+            app.UseCors("CorsPolicy");
+
             app.UseAuthentication();
             app.UseAuthorization();
+
             app.MapControllers();
 
             // Initialize the database
@@ -161,56 +146,27 @@ namespace HotelManagementApp
                 {
                     var services = scope.ServiceProvider;
 
-                    try
+                    var dbContext = services.GetRequiredService<AppDbContext>();
+                    Console.WriteLine("Testing database connection...");
+
+                    var canConnect = dbContext.Database.CanConnectAsync().GetAwaiter().GetResult();
+                    Console.WriteLine($"Database connection test result: {canConnect}");
+
+                    if (!canConnect)
                     {
-                        // Test database connection first
-                        var dbContext = services.GetRequiredService<AppDbContext>();
-                        Console.WriteLine("Testing database connection...");
+                        Console.WriteLine("WARNING: Cannot connect to database. Check your connection string.");
 
-                        // Try simple database operations to verify connection
-                        var canConnect = dbContext.Database.CanConnectAsync().GetAwaiter().GetResult();
-                        Console.WriteLine($"Database connection test result: {canConnect}");
-
-                        if (!canConnect)
-                        {
-                            Console.WriteLine("WARNING: Cannot connect to database. Check your connection string.");
-
-                            // For development, we can create the database if it doesn't exist
-                            if (app.Environment.IsDevelopment())
-                            {
-                                Console.WriteLine("Attempting to create database...");
-                                dbContext.Database.EnsureCreated();
-                                Console.WriteLine("Database creation attempted");
-                            }
-                        }
-
-                        // Initialize database with test data if in development
-                        Console.WriteLine("Initializing database...");
-                        // DbInitializer.Initialize(services, app.Environment.IsDevelopment()).GetAwaiter().GetResult();
-                        RunTestDataSeeder(app);
-                        Console.WriteLine("Database initialized successfully");
-
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Database initialization error: {ex.Message}");
-                        Console.WriteLine(ex.StackTrace);
-
-                        // Log the error but don't crash in development
                         if (app.Environment.IsDevelopment())
                         {
-                            var logger = services.GetService<ILogger<Program>>();
-                            if (logger != null)
-                            {
-                                logger.LogError(ex, "An error occurred while initializing the database");
-                            }
-                        }
-                        else
-                        {
-                            // Rethrow in production to prevent starting with invalid database
-                            throw;
+                            Console.WriteLine("Attempting to create database...");
+                            dbContext.Database.EnsureCreated();
+                            Console.WriteLine("Database creation attempted");
                         }
                     }
+
+                    Console.WriteLine("Initializing database...");
+                    RunTestDataSeeder(app);
+                    Console.WriteLine("Database initialized successfully");
                 }
 
                 Console.WriteLine("Application initialization completed, starting web server...");
@@ -220,17 +176,15 @@ namespace HotelManagementApp
                 Console.WriteLine($"Startup error: {ex.Message}");
                 Console.WriteLine(ex.StackTrace);
 
-                // Only crash in production, let development continue with issues
                 if (!app.Environment.IsDevelopment())
                 {
                     return;
                 }
             }
-            // Run database seeder
-            
-            // Run the application with synchronous Run rather than async RunAsync
+
             app.Run();
         }
+
         private static void RunTestDataSeeder(WebApplication app)
         {
             using var scope = app.Services.CreateScope();
@@ -241,10 +195,8 @@ namespace HotelManagementApp
                 var context = services.GetRequiredService<AppDbContext>();
                 var logger = services.GetRequiredService<ILogger<Program>>();
 
-                // Ensure database is created
                 context.Database.EnsureCreated();
 
-                // Run the TestDataSeeder
                 TestDataSeeder.SeedTestData(services, logger).GetAwaiter().GetResult();
 
                 logger.LogInformation("Test data seeding completed successfully.");

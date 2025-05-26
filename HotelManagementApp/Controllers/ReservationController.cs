@@ -5,6 +5,7 @@ using HotelManagementApp.Services;
 using HotelManagementApp.Services.ReservationServiceSpace;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace HotelManagementApp.Controllers
 {
@@ -53,8 +54,8 @@ namespace HotelManagementApp.Controllers
                 // If guest role, check if reservation belongs to user
                 if (User.IsInRole("Guest"))
                 {
-                    var userId = int.Parse(User.FindFirst("sub")?.Value ?? "0");
-                    if (reservation.UserId != userId)
+                    var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId) || reservation.UserId != userId)
                     {
                         return Forbid();
                     }
@@ -78,8 +79,8 @@ namespace HotelManagementApp.Controllers
                 // If guest role, check if user is requesting own reservations
                 if (User.IsInRole("Guest"))
                 {
-                    var currentUserId = int.Parse(User.FindFirst("sub")?.Value ?? "0");
-                    if (userId != currentUserId)
+                    var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int currentUserId) || userId != currentUserId)
                     {
                         return Forbid();
                     }
@@ -197,7 +198,11 @@ namespace HotelManagementApp.Controllers
                     return BadRequest("Check-out date must be after check-in date");
                 }
 
-                var userId = int.Parse(User.FindFirst("sub")?.Value ?? "0");
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId) || userId < 1)
+                {
+                    return Unauthorized("User ID not found or invalid in token.");
+                }
 
                 // Let the service generate the reservation number
                 var reservation = new Reservation
@@ -209,7 +214,6 @@ namespace HotelManagementApp.Controllers
                     NumberOfGuests = createReservationDto.NumberOfGuests,
                     SpecialRequests = createReservationDto.SpecialRequests,
                     PaymentMethod = createReservationDto.PaymentMethod,
-                    // Don't set ReservationNumber or Status - let the service handle it
                 };
 
                 var createdReservation = await _reservationService.CreateReservationAsync(reservation);
@@ -223,10 +227,9 @@ namespace HotelManagementApp.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating reservation");
-                return StatusCode(500, "An error occurred while creating the reservation");
+                return StatusCode(500, ex.ToString()); // TEMP: Return full exception for debugging
             }
         }
-
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin,Manager,Receptionist")]
@@ -272,7 +275,10 @@ namespace HotelManagementApp.Controllers
                 // If guest role, check if reservation belongs to user
                 if (User.IsInRole("Guest"))
                 {
-                    var userId = int.Parse(User.FindFirst("sub")?.Value ?? "0");
+                    var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                        return Forbid();
+
                     var reservation = await _reservationService.GetReservationByIdAsync(id);
                     if (reservation == null || reservation.UserId != userId)
                     {
@@ -305,7 +311,10 @@ namespace HotelManagementApp.Controllers
         {
             try
             {
-                var receptionistId = int.Parse(User.FindFirst("sub")?.Value ?? "0");
+                var receptionistIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(receptionistIdClaim) || !int.TryParse(receptionistIdClaim, out int receptionistId))
+                    return Unauthorized("User ID not found or invalid in token.");
+
                 var result = await _reservationService.CheckInAsync(id, checkInDto.RoomId, receptionistId);
                 if (!result)
                 {
@@ -336,7 +345,10 @@ namespace HotelManagementApp.Controllers
         {
             try
             {
-                var receptionistId = int.Parse(User.FindFirst("sub")?.Value ?? "0");
+                var receptionistIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(receptionistIdClaim) || !int.TryParse(receptionistIdClaim, out int receptionistId))
+                    return Unauthorized("User ID not found or invalid in token.");
+
                 var result = await _reservationService.CheckOutAsync(id, receptionistId);
                 if (!result)
                 {
@@ -400,4 +412,3 @@ namespace HotelManagementApp.Controllers
         }
     }
 }
-

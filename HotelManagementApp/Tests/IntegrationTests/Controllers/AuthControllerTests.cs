@@ -2,6 +2,7 @@
 using HotelManagementApp.Controllers;
 using HotelManagementApp.Models;
 using HotelManagementApp.Services.Authentication;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using System.Threading.Tasks;
@@ -13,11 +14,15 @@ namespace HotelManagementApp.Tests.IntegrationTests.Controllers
     {
         private readonly Mock<IAuthenticationService> _mockAuthService;
         private readonly AuthController _controller;
+        private readonly Mock<UserManager<ApplicationUser>> _mockUserManager;
 
         public AuthControllerTests()
         {
             _mockAuthService = new Mock<IAuthenticationService>();
-            _controller = new AuthController(_mockAuthService.Object);
+            _mockUserManager = new Mock<UserManager<ApplicationUser>>(
+                Mock.Of<IUserStore<ApplicationUser>>(), null, null, null, null, null, null, null, null
+            );
+            _controller = new AuthController(_mockAuthService.Object, _mockUserManager.Object);
         }
 
         [Fact]
