@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using HotelManagementApp.Models.DTOs.RoomType.HotelManagementApp.Models.DTOs.RoomType;
 
 
 namespace HotelManagementApp.Services.RoomServiceSpace
@@ -677,7 +678,202 @@ namespace HotelManagementApp.Services.RoomServiceSpace
                 };
             }
 
-            #endregion
+        #endregion
+        #region RoomType Operations
+
+        public async Task<IEnumerable<RoomTypeDto>> GetAllRoomTypesAsync()
+        {
+            try
+            {
+                var roomTypes = await _context.RoomTypes
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                return roomTypes.Select(rt => MapToRoomTypeDto(rt));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all room types");
+                throw;
+            }
         }
-    
+
+        public async Task<RoomTypeDto> GetRoomTypeByIdAsync(int id)
+        {
+            try
+            {
+                var roomType = await _context.RoomTypes
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(rt => rt.Id == id);
+
+                if (roomType == null)
+                {
+                    return null;
+                }
+
+                return MapToRoomTypeDto(roomType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving room type with ID {RoomTypeId}", id);
+                throw;
+            }
+        }
+
+        public async Task<RoomTypeDto> CreateRoomTypeAsync(CreateRoomTypeDto roomTypeDto)
+        {
+            try
+            {
+                // Check if room type with same name already exists
+                if (await _context.RoomTypes.AnyAsync(rt => rt.Name == roomTypeDto.Name))
+                {
+                    throw new InvalidOperationException($"A room type with name '{roomTypeDto.Name}' already exists");
+                }
+
+                // Create a new RoomType entity
+                var roomType = new RoomType
+                {
+                    Name = roomTypeDto.Name,
+                    Description = roomTypeDto.Description,
+                    Capacity = roomTypeDto.Capacity,
+                    BasePrice = roomTypeDto.BasePrice,
+                    Amenities = roomTypeDto.Amenities,
+                    ImageUrl = roomTypeDto.ImageUrl ?? string.Empty
+                };
+
+                // Add room type to database
+                _context.RoomTypes.Add(roomType);
+                await _context.SaveChangesAsync();
+
+                return MapToRoomTypeDto(roomType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating room type {@RoomTypeDto}", roomTypeDto);
+                throw;
+            }
+        }
+
+        public async Task<RoomTypeDto> UpdateRoomTypeAsync(int id, UpdateRoomTypeDto roomTypeDto)
+        {
+            try
+            {
+                var roomType = await _context.RoomTypes.FindAsync(id);
+                if (roomType == null)
+                {
+                    throw new KeyNotFoundException($"Room type with ID {id} not found");
+                }
+
+                // Update name if provided and not duplicate
+                if (!string.IsNullOrEmpty(roomTypeDto.Name) && roomTypeDto.Name != roomType.Name)
+                {
+                    if (await _context.RoomTypes.AnyAsync(rt => rt.Name == roomTypeDto.Name && rt.Id != id))
+                    {
+                        throw new InvalidOperationException($"A room type with name '{roomTypeDto.Name}' already exists");
+                    }
+                    roomType.Name = roomTypeDto.Name;
+                }
+
+                // Update other properties if provided
+                if (!string.IsNullOrEmpty(roomTypeDto.Description))
+                {
+                    roomType.Description = roomTypeDto.Description;
+                }
+
+                if (roomTypeDto.Capacity.HasValue)
+                {
+                    roomType.Capacity = roomTypeDto.Capacity.Value;
+                }
+
+                if (roomTypeDto.BasePrice.HasValue)
+                {
+                    roomType.BasePrice = roomTypeDto.BasePrice.Value;
+                }
+
+                if (!string.IsNullOrEmpty(roomTypeDto.Amenities))
+                {
+                    roomType.Amenities = roomTypeDto.Amenities;
+                }
+
+                if (!string.IsNullOrEmpty(roomTypeDto.ImageUrl))
+                {
+                    roomType.ImageUrl = roomTypeDto.ImageUrl;
+                }
+
+                // Save changes
+                await _context.SaveChangesAsync();
+
+                return MapToRoomTypeDto(roomType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating room type with ID {RoomTypeId}", id);
+                throw;
+            }
+        }
+
+        public async Task<bool> DeleteRoomTypeAsync(int id)
+        {
+            try
+            {
+                var roomType = await _context.RoomTypes.FindAsync(id);
+                if (roomType == null)
+                {
+                    return false;
+                }
+
+                // Check if there are any rooms using this room type
+                bool hasRooms = await _context.Rooms.AnyAsync(r => r.RoomTypeId == id);
+
+                if (hasRooms)
+                {
+                    throw new InvalidOperationException("Cannot delete room type that is in use by rooms");
+                }
+
+                // Check if there are any reservations using this room type
+                bool hasReservations = await _context.Reservations.AnyAsync(r => r.RoomTypeId == id);
+
+                if (hasReservations)
+                {
+                    throw new InvalidOperationException("Cannot delete room type that is in use by reservations");
+                }
+
+                _context.RoomTypes.Remove(roomType);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting room type with ID {RoomTypeId}", id);
+                throw;
+            }
+        }
+
+        private RoomTypeDto MapToRoomTypeDto(RoomType roomType)
+        {
+            if (roomType == null)
+                return null;
+
+            return new RoomTypeDto
+            {
+                Id = roomType.Id,
+                Name = roomType.Name,
+                Description = roomType.Description,
+                Capacity = roomType.Capacity,
+                BasePrice = roomType.BasePrice,
+                Amenities = roomType.Amenities?.Split(',') ?? Array.Empty<string>(),
+                ImageUrl = roomType.ImageUrl,
+
+                // We can add statistics here later if needed
+                TotalRooms = 0,
+                AvailableRooms = 0,
+                OccupiedRooms = 0,
+                OccupancyRate = 0,
+                AverageRating = 0
+            };
+        }
+        #endregion
+
+    }
+
 }

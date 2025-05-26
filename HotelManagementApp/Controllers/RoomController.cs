@@ -1,4 +1,5 @@
 ﻿using HotelManagementApp.Models.DTOs.Room;
+using HotelManagementApp.Models.DTOs.RoomType.HotelManagementApp.Models.DTOs.RoomType;
 using HotelManagementApp.Models.Enums;
 using HotelManagementApp.Services.RoomServiceSpace;
 using Microsoft.AspNetCore.Authorization;
@@ -227,5 +228,117 @@ namespace HotelManagementApp.Controllers
                 return StatusCode(500, "An error occurred while deleting the room");
             }
         }
+        #region RoomType Endpoints
+
+        [HttpGet("types")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<RoomTypeDto>>> GetAllRoomTypes()
+        {
+            try
+            {
+                var roomTypes = await _roomService.GetAllRoomTypesAsync();
+                return Ok(roomTypes);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all room types");
+                return StatusCode(500, "An error occurred while retrieving room types");
+            }
+        }
+
+        [HttpGet("types/{id}")]
+        [AllowAnonymous]
+        public async Task<ActionResult<RoomTypeDto>> GetRoomTypeById(int id)
+        {
+            try
+            {
+                var roomType = await _roomService.GetRoomTypeByIdAsync(id);
+                if (roomType == null)
+                {
+                    return NotFound($"Room type with ID {id} not found");
+                }
+                return Ok(roomType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving room type with ID {RoomTypeId}", id);
+                return StatusCode(500, "An error occurred while retrieving the room type");
+            }
+        }
+
+        [HttpPost("types")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<ActionResult<RoomTypeDto>> CreateRoomType(CreateRoomTypeDto createRoomTypeDto)
+        {
+            try
+            {
+                var roomType = await _roomService.CreateRoomTypeAsync(createRoomTypeDto);
+                return CreatedAtAction(nameof(GetRoomTypeById), new { id = roomType.Id }, roomType);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation: {Message}", ex.Message);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating room type");
+                return StatusCode(500, "An error occurred while creating the room type");
+            }
+        }
+
+        [HttpPut("types/{id}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<ActionResult<RoomTypeDto>> UpdateRoomType(int id, UpdateRoomTypeDto updateRoomTypeDto)
+        {
+            try
+            {
+                var roomType = await _roomService.UpdateRoomTypeAsync(id, updateRoomTypeDto);
+                return Ok(roomType);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Room type not found: {Message}", ex.Message);
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation: {Message}", ex.Message);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating room type with ID {RoomTypeId}", id);
+                return StatusCode(500, "An error occurred while updating the room type");
+            }
+        }
+
+        [HttpDelete("types/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteRoomType(int id)
+        {
+            try
+            {
+                var result = await _roomService.DeleteRoomTypeAsync(id);
+                if (!result)
+                {
+                    return NotFound($"Room type with ID {id} not found");
+                }
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation: {Message}", ex.Message);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting room type with ID {RoomTypeId}", id);
+                return StatusCode(500, "An error occurred while deleting the room type");
+            }
+        }
+
+        #endregion
+
     }
 }

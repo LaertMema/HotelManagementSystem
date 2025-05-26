@@ -1,5 +1,6 @@
 ﻿using HotelManagementApp.Models;
 using HotelManagementApp.Services.Authentication;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 
@@ -10,10 +11,12 @@ namespace HotelManagementApp.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthenticationService _authService;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public AuthController(IAuthenticationService authService)
+        public AuthController(IAuthenticationService authService, UserManager<ApplicationUser> userManager)
         {
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+            _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
         }
 
         [HttpPost("login")]
@@ -50,7 +53,20 @@ namespace HotelManagementApp.Controllers
                 return NotFound("User not found or not authenticated");
             }
 
-            return Ok(user);
+            // Get roles for the user
+            var roles = await _userManager.GetRolesAsync(user);
+
+            // Return user info + roles array
+            return Ok(new
+            {
+                id = user.Id,
+                username = user.UserName,
+                email = user.Email,
+                firstName = user.FirstName,
+                lastName = user.LastName,
+                phoneNumber = user.PhoneNumber,
+                roles = roles // <-- This is what your frontend expects!
+            });
         }
 
         [HttpPost("change-password")]
@@ -202,4 +218,3 @@ namespace HotelManagementApp.Controllers
         public string Token { get; set; }
     }
 }
-
